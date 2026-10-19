@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import AVFoundation
+import SwiftUI
 import PrompterCore
 @testable import LensPrompt
 
@@ -130,4 +131,88 @@ private final class NoVideoRequests: URLProtocol, @unchecked Sendable {
         let output = CameraHardware.makeMovieOutput()
         #expect(!output.isDeferredStartEnabled)
     }
+}
+
+@Test @MainActor func feedbackKeepsTheSamePreviewAttachedUntilMovieFinishes() async throws {
+    let model = FeedbackModel(script: .sample)
+    let controller = UIHostingController(rootView: FeedbackView(model: model))
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+    window.rootViewController = controller
+    window.makeKeyAndVisible()
+    defer { window.isHidden = true }
+    func previews(in layer: CALayer) -> [AVCaptureVideoPreviewLayer] {
+        (layer as? AVCaptureVideoPreviewLayer).map { [$0] } ?? (layer.sublayers ?? []).flatMap { previews(in: $0) }
+    }
+    try await Task.sleep(for: .milliseconds(150))
+    controller.view.layoutIfNeeded()
+    let original = try #require(previews(in: controller.view.layer).first)
+    #expect(original.session === model.camera.session)
+    for phase in [FeedbackModel.Phase.preparing, .recording, .finishing, .processing, .review, .intro] {
+        model.phase = phase
+        try await Task.sleep(for: .milliseconds(100))
+        controller.view.layoutIfNeeded()
+        let current = previews(in: controller.view.layer)
+        #expect(current.count == 1)
+        #expect(current.first === original)
+        #expect(original.session === model.camera.session)
+    }
+    await model.close()
+}
+
+@Test func detailedEightSecondVideoFitsTheUploadBudgetWithoutTruncation() async throws {
+    let media = FeedbackMedia()
+    let folder = try await media.makeFolder()
+    defer { Task { await media.remove(folder) } }
+    let audioFixture = try await media.synthetic(in: folder)
+    let source = folder.appendingPathComponent("detailed.mov")
+    let writer = try AVAssetWriter(outputURL: source, fileType: .mov)
+    let input = AVAssetWriterInput(mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 1280, AVVideoHeightKey: 720, AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 25_000_000]])
+    let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey as String: 1280, kCVPixelBufferHeightKey as String: 720])
+    writer.add(input)
+    #expect(writer.startWriting())
+    writer.startSession(atSourceTime: .zero)
+    var buffers: [CVPixelBuffer] = []
+    var random: UInt32 = 42
+    for _ in 0..<4 {
+        var optional: CVPixelBuffer?
+        #expect(CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720, kCVPixelFormatType_32BGRA, nil, &optional) == kCVReturnSuccess)
+        let buffer = try #require(optional)
+        CVPixelBufferLockBaseAddress(buffer, [])
+        let base = try #require(CVPixelBufferGetBaseAddress(buffer)).assumingMemoryBound(to: UInt32.self)
+        let row = CVPixelBufferGetBytesPerRow(buffer) / 4
+        for y in 0..<720 { for x in 0..<1280 {
+            random = random &* 1664525 &+ 1013904223
+            base[y * row + x] = 0xff000000 | (random & 0xffffff)
+        } }
+        CVPixelBufferUnlockBaseAddress(buffer, [])
+        buffers.append(buffer)
+    }
+    for frame in 0..<240 {
+        var waits = 0
+        while !input.isReadyForMoreMediaData {
+            try #require(writer.status == .writing && waits < 1000)
+            waits += 1; try await Task.sleep(for: .milliseconds(5))
+        }
+        try #require(adaptor.append(buffers[frame % 4], withPresentationTime: CMTime(value: Int64(frame), timescale: 30)))
+    }
+    input.markAsFinished(); await writer.finishWriting()
+    try #require(writer.status == .completed)
+    let video = AVURLAsset(url: source), audio = AVURLAsset(url: audioFixture.url)
+    let composition = AVMutableComposition()
+    let videoSource = try #require(try await video.loadTracks(withMediaType: .video).first)
+    let audioSource = try #require(try await audio.loadTracks(withMediaType: .audio).first)
+    let videoTrack = try #require(composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid))
+    let audioTrack = try #require(composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid))
+    let range = CMTimeRange(start: .zero, duration: CMTime(seconds: 8, preferredTimescale: 600))
+    try videoTrack.insertTimeRange(range, of: videoSource, at: .zero)
+    try audioTrack.insertTimeRange(range, of: audioSource, at: .zero)
+    let combined = folder.appendingPathComponent("detailed-audio.mov")
+    let exporter = try #require(AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough))
+    exporter.outputURL = combined; exporter.outputFileType = .mov
+    await withCheckedContinuation { continuation in exporter.exportAsynchronously { continuation.resume() } }
+    try #require(exporter.status == .completed)
+    let clip = try await media.prepare(combined, in: folder)
+    #expect(clip.byteCount > 0 && clip.byteCount <= 8_000_000)
+    #expect(clip.duration >= 7.9 && clip.duration <= 8.01)
+    #expect(clip.metrics.silenceFraction < 1)
 }

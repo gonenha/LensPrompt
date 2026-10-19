@@ -43,6 +43,7 @@ import PrompterCore
     }
     func start(travel: Double) {
         guard phase == .intro, !left else { return }
+        CaptureTrace.record("feedback.start", reset: true)
         camera.onStarted = { [weak self] in self?.started() }
         // Keep the owner alive until its movie delegate finishes, including forced dismissal.
         camera.onFinished = { [self] url, message, usable in Task { await finished(url: url, usable: usable, captureError: message) } }
@@ -63,7 +64,9 @@ import PrompterCore
                 // Mark writing before awaiting the hardware: cancellation may race didStart.
                 phase = .recording
                 UIApplication.shared.isIdleTimerDisabled = true
+                CaptureTrace.record("feedback.beforeStart cancelled=\(Task.isCancelled) left=\(left) discarded=\(discarded)")
                 try await camera.startMovie(at: url)
+                CaptureTrace.record("feedback.afterStart cancelled=\(Task.isCancelled) left=\(left) discarded=\(discarded)")
                 guard !Task.isCancelled, !discarded, !left else { await camera.stopMovie(); return }
                 playback.start(travel: travel, duration: script.settings.duration(wordCount: script.wordCount), text: script.text, followsVoice: false)
                 if script.presentationMode == .talkingPoints { playback.clock.isPaused = true }
@@ -75,6 +78,7 @@ import PrompterCore
         }
     }
     private func started() {
+        CaptureTrace.record("feedback.started phase=\(phase) left=\(left) discarded=\(discarded)")
         guard phase == .recording, !discarded, !left else { Task { await camera.stopMovie() }; return }
         let began = ProcessInfo.processInfo.systemUptime
         clock = Task {
@@ -86,6 +90,7 @@ import PrompterCore
         }
     }
     func stop(discard: Bool = false) {
+        CaptureTrace.record("feedback.stop phase=\(phase) discard=\(discard) elapsed=\(elapsed)")
         guard writing else { if discard { cancelPending() }; return }
         discarded = discarded || discard
         phase = .finishing; clock?.cancel(); playback.stop()
@@ -173,12 +178,14 @@ import PrompterCore
         generation = UUID(); work?.cancel(); phase = .review
     }
     func background() {
+        CaptureTrace.record("feedback.background phase=\(phase)")
         showingApproval = false; approvalIdentity = nil
         if writing { stop(discard: true) }
         else if phase == .analyzing { cancelAnalysis() }
         else if phase == .preparing || phase == .processing { cancelPending() }
     }
     func leave() {
+        CaptureTrace.record("feedback.leave phase=\(phase)")
         left = true; showingApproval = false; approvalIdentity = nil
         if writing { stop(discard: true) } else { cancelPending() }
     }
@@ -200,6 +207,7 @@ import PrompterCore
         }
     }
     private func cleanup() async {
+        CaptureTrace.record("feedback.cleanup phase=\(phase)")
         camera.onFinished = nil; camera.onStarted = nil
         await camera.suspendPreview()
         if let folder { await media.remove(folder) }

@@ -9,15 +9,20 @@ struct FeedbackView: View {
     @State private var layoutCache = PromptLayoutCache()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    init(script: Script) { _model = State(initialValue: FeedbackModel(script: script)) }
+    init(script: Script) { self.init(model: FeedbackModel(script: script)) }
+    init(model: FeedbackModel) { _model = State(initialValue: model) }
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
                 let width = geometry.size.width * model.script.settings.widthFraction
                 let layout = layoutCache.layout(text: model.script.presentationMode == .talkingPoints ? "" : model.script.text, width: width - 32, fontSize: model.script.settings.fontSize)
-                Group {
+                ZStack {
+                    // Keep the preview connection attached while the movie starts
+                    // and finishes; mounting/unmounting it reconfigures capture.
+                    CameraPreview(session: model.camera.session).ignoresSafeArea()
                     if model.phase == .recording { capture(layout: layout, width: width) }
-                    else { ScrollView { content(travel: layout.lastLineY).padding(24) } }
+                    else { ScrollView { content(travel: layout.lastLineY).padding(24) }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity).background(LensTheme.background) }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
                     .overlay {
                         if model.busy {
@@ -118,7 +123,6 @@ struct FeedbackView: View {
     }
     private func capture(layout: PromptLayout, width: CGFloat) -> some View {
         ZStack {
-            CameraPreview(session: model.camera.session).ignoresSafeArea()
             VStack(spacing: 16) {
                 Label("מקליטים מקטע בדיקה · \(min(8, Int(model.elapsed))) / 8", systemImage: "record.circle.fill").font(.headline).padding(12).background(.black.opacity(0.7), in: Capsule())
                 if model.script.presentationMode == .talkingPoints, let point = model.currentPoint {

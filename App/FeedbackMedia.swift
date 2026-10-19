@@ -63,18 +63,31 @@ actor FeedbackMedia {
         let seconds = try await asset.load(.duration).seconds
         guard seconds.isFinite, seconds >= 6 else { throw FeedbackFailure.duration }
         let length = min(8, seconds)
-        let destination = folder.appendingPathComponent("review-" + UUID().uuidString + ".mp4")
-        guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1280x720) else { throw FeedbackFailure.media }
-        exporter.outputURL = destination; exporter.outputFileType = .mp4
-        exporter.shouldOptimizeForNetworkUse = true
-        exporter.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: length, preferredTimescale: 600))
-        try await FeedbackExport(exporter).run()
-        try Task.checkCancellation()
-        guard exporter.status == .completed else { throw FeedbackFailure.media }
+        var prepared: URL?
+        // The size hint is advisory: same-size exports can preserve the source
+        // bitrate. Retry a smaller video preset rather than reject the clip.
+        for preset in [AVAssetExportPreset1280x720, AVAssetExportPreset960x540, AVAssetExportPreset640x480] {
+            try Task.checkCancellation()
+            let candidate = folder.appendingPathComponent("review-" + UUID().uuidString + ".mp4")
+            guard let exporter = AVAssetExportSession(asset: asset, presetName: preset) else { throw FeedbackFailure.media }
+            exporter.outputURL = candidate; exporter.outputFileType = .mp4
+            exporter.shouldOptimizeForNetworkUse = true
+            exporter.fileLengthLimit = 7_500_000
+            exporter.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: length, preferredTimescale: 600))
+            try await FeedbackExport(exporter).run()
+            try Task.checkCancellation()
+            let size = try candidate.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            CaptureTrace.record("media.export preset=\(preset) bytes=\(size)")
+            guard size > 0 else { throw FeedbackFailure.media }
+            if size <= 8_000_000 { prepared = candidate; break }
+            try FileManager.default.removeItem(at: candidate)
+        }
+        guard let destination = prepared else { throw FeedbackFailure.size }
         let final = AVURLAsset(url: destination)
         let duration = try await final.load(.duration).seconds
         guard FeedbackRules.validDuration(duration), let finalVideo = try await final.loadTracks(withMediaType: .video).first, !(try await final.loadTracks(withMediaType: .audio)).isEmpty else { throw FeedbackFailure.duration }
         let size = try destination.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        CaptureTrace.record("media.export bytes=\(size) duration=\(duration)")
         guard size > 0, size <= 8_000_000 else { throw FeedbackFailure.size }
         let natural = try await finalVideo.load(.naturalSize)
         let transform = try await finalVideo.load(.preferredTransform)
