@@ -27,7 +27,7 @@ struct BrandLoadingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         VStack(spacing: 22) {
-            PulsingLogo(animated: !reduceMotion).frame(width: 96, height: 96).accessibilityHidden(true)
+            PulsingLogo(animated: !reduceMotion).frame(width: 58, height: 58).accessibilityHidden(true)
             ProgressView().tint(LensTheme.accent)
             Text(title).font(.headline).multilineTextAlignment(.center)
             if let cancel { Button("ביטול", action: cancel).padding(12) }
@@ -40,8 +40,13 @@ private struct PulsingLogo: UIViewRepresentable {
     let animated: Bool
     func makeUIView(context: Context) -> UIImageView {
         let view = UIImageView(image: UIImage(named: "LensLogo")); view.contentMode = .scaleAspectFit
-        view.layer.cornerRadius = 22; view.clipsToBounds = true
+        view.layer.cornerRadius = 14; view.clipsToBounds = true
         return view
+    }
+    // UIImageView's intrinsic size is the full asset resolution; honor SwiftUI's
+    // proposed bounds so the image cannot expand beyond the loading logo frame.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIImageView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 58, height: proposal.height ?? 58)
     }
     func updateUIView(_ view: UIImageView, context: Context) {
         if animated && view.layer.animation(forKey: "pulse") == nil {
