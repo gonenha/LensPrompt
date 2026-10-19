@@ -8,3 +8,5 @@ The approved mark combines an open lens ring, three prompt-text strokes and a co
 - Giglo endorsement colors: lime `#C3EE2B`, coral `#FF4F35`; app background `#171916`, ivory text `#F2F1E8`.
 
 The icon is polished raster artwork derived from the approved visual concept; no editable vector master is included. Keep the two catalog images identical when replacing the symbol.
+
+The native `App/LaunchScreen.storyboard` displays the same symbol and Hebrew product name on the studio background during cold launch. No artificial delay is added; iOS controls how long the launch screen is visible. The storyboard name is configured in both Info.plist and project.yml.
