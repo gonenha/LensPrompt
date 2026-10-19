@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum LensTheme {
     static let background = Color(red: 23/255, green: 25/255, blue: 22/255)
@@ -47,5 +48,33 @@ struct StudioChoice: View {
                 .foregroundStyle(selected ? LensTheme.background : LensTheme.muted)
                 .background(selected ? LensTheme.accent : LensTheme.surface, in: RoundedRectangle(cornerRadius: 12))
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+struct CopyTextButton: View {
+    let text: String
+    let field: String
+    let identifier: String
+    @State private var copied = false
+
+    var body: some View {
+        Button {
+            UIPasteboard.general.string = text
+            copied = true
+        } label: {
+            Label(copied ? "הועתק" : "העתקה", systemImage: copied ? "checkmark" : "doc.on.doc")
+                .font(.caption.weight(.semibold)).fixedSize(horizontal: true, vertical: true)
+                .frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        }.buttonStyle(.plain).foregroundStyle(LensTheme.accent)
+            .disabled(text.isEmpty)
+            .accessibilityLabel("העתקת " + field)
+            .accessibilityValue(copied ? "הועתק ללוח" : "")
+            .accessibilityIdentifier("copy-" + identifier)
+            .onChange(of: text) { _, _ in copied = false }
+            .task(id: copied) {
+                guard copied else { return }
+                do { try await Task.sleep(for: .seconds(2)); copied = false }
+                catch { }
+            }
     }
 }

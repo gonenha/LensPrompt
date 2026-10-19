@@ -70,6 +70,8 @@ struct SetupView: View {
                         TextField("שניות", value: $script.settings.targetSeconds, format: .number.precision(.fractionLength(0)))
                             .keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 85).textFieldStyle(.roundedBorder)
                     }
+                    CopyTextButton(text: script.settings.targetSeconds.formatted(.number.precision(.fractionLength(0))), field: "משך היעד בשניות", identifier: "duration")
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 }
                 settingLabel("גודל הטקסט", value: "\(Int(script.settings.fontSize))")
