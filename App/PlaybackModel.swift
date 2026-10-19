@@ -82,7 +82,7 @@ final class PlaybackModel {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .right; paragraph.baseWritingDirection = .rightToLeft
         paragraph.lineSpacing = fontSize * 0.35
-        let attributed = NSAttributedString(string: text, attributes: [.font: font, .paragraphStyle: paragraph, .foregroundColor: UIColor.white])
+        let attributed = NSAttributedString(string: text, attributes: [.font: font, .paragraphStyle: paragraph, .foregroundColor: UIColor(LensTheme.text)])
         let storage = NSTextStorage(attributedString: attributed)
         let manager = NSLayoutManager()
         let container = NSTextContainer(size: CGSize(width: max(1, width), height: .greatestFiniteMagnitude))

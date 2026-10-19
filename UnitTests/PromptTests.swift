@@ -86,8 +86,8 @@ import SwiftUI
     defer { window.isHidden = true }
     host.view.layoutIfNeeded()
     let text = try #require(textView(in: host.view))
-    #expect(text.textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil) != nil)
-    #expect(text.textStorage.attribute(.backgroundColor, at: 0, effectiveRange: nil) == nil)
+    #expect(text.textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? UIColor == UIColor(LensTheme.accent))
+    #expect(text.textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor == UIColor(LensTheme.text))
     text.layoutManager.ensureLayout(for: text.textContainer)
     let glyph = text.layoutManager.glyphRange(forCharacterRange: NSRange(location: 5, length: 7), actualCharacterRange: nil)
     let rect = text.layoutManager.boundingRect(forGlyphRange: glyph, in: text.textContainer)

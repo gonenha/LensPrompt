@@ -13,20 +13,21 @@ struct LibraryView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 8) { Circle().fill(LensTheme.green).frame(width: 9, height: 9); Text("מול העדשה").font(.subheadline.weight(.semibold)) }
-                        .foregroundStyle(LensTheme.green).padding(.top, 14)
-                    Text("התסריטים שלי").font(.largeTitle.bold())
-                    Text("מילים מוכנות. עכשיו תורך.").font(.subheadline).foregroundStyle(.secondary).padding(.bottom, 12)
+                    HStack(spacing: 12) {
+                        Image(systemName: "viewfinder").font(.system(size: 32, weight: .medium)).foregroundStyle(LensTheme.accent)
+                        Text("מול העדשה").font(.largeTitle.bold())
+                    }.padding(.top, 14).padding(.bottom, 12)
+                    Text("מוכנים לטייק הבא?").font(.title2.bold()).padding(.bottom, 8)
                     if let notice = library.bridgeNotice {
-                        Label(notice, systemImage: "arrow.down.doc").font(.footnote).foregroundStyle(LensTheme.green)
+                        Label(notice, systemImage: "arrow.down.doc").font(.footnote).foregroundStyle(LensTheme.accent)
                             .accessibilityIdentifier("codex-inbox-notice")
                     }
                     if !library.scriptsLoaded {
                         ContentUnavailableView("התסריטים לא נטענו", systemImage: "exclamationmark.triangle", description: Text("לא שינינו את הקבצים שלך."))
                         Button("ניסיון נוסף") { library.reload() }.buttonStyle(MainButtonStyle())
                     } else {
-                        ForEach(library.scripts) { script in
-                            Button { path.append(script.id) } label: { ScriptCard(script: script) }
+                        ForEach(Array(library.scripts.enumerated()), id: \.element.id) { index, script in
+                            Button { path.append(script.id) } label: { ScriptCard(script: script, number: index + 1) }
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier(script.isSample ? "sample-script" : "script-\(script.id)")
                                 .contextMenu {
@@ -35,18 +36,38 @@ struct LibraryView: View {
                                 }
                         }
                         if library.scripts.isEmpty { Text("כאן יופיעו התסריטים שלך.").foregroundStyle(.secondary).padding(.vertical, 25) }
-                        Button { let script = Script(title: "תסריט חדש"); library.upsert(script); path.append(script.id) } label: {
-                            Label("תסריט חדש", systemImage: "plus")
-                        }.buttonStyle(MainButtonStyle()).accessibilityIdentifier("new-script")
-                        Button { importing = true } label: { Label("ייבוא קובץ טקסט", systemImage: "square.and.arrow.down") }
-                            .font(.subheadline).frame(maxWidth: .infinity).padding(10)
+
                     }
-                    Text("כותבים במקבוק, מדביקים כאן.\nהמלל נשמר במכשיר שלך.").font(.footnote).foregroundStyle(.secondary).lineSpacing(5).padding(.top, 10)
+                    Text("התסריטים והטייקים נשמרים במכשיר שלך.").font(.footnote).foregroundStyle(.secondary).lineSpacing(5).padding(.top, 10)
                 }.padding(24)
             }
-            .background(LensTheme.paper).foregroundStyle(LensTheme.ink)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button { showingTakes = true } label: { Label("הטייקים שלי", systemImage: "film.stack") }.accessibilityIdentifier("takes") }
+            .background(LensTheme.background).foregroundStyle(LensTheme.text)
+            .toolbar(path.isEmpty ? .hidden : .visible, for: .navigationBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if path.isEmpty {
+                    VStack(spacing: 8) {
+                        if library.scriptsLoaded {
+                            Button { let script = Script(title: "תסריט חדש"); library.upsert(script); path.append(script.id) } label: {
+                                Label("תסריט חדש", systemImage: "plus")
+                            }.buttonStyle(MainButtonStyle()).accessibilityIdentifier("new-script").padding(.horizontal, 24)
+                            Button { importing = true } label: {
+                                Label("ייבוא קובץ טקסט", systemImage: "square.and.arrow.down")
+                                    .font(.subheadline).frame(maxWidth: .infinity, minHeight: 48)
+                            }
+                        }
+                        HStack(spacing: 24) {
+                            Button {} label: {
+                                VStack(spacing: 5) { Image(systemName: "doc.text.fill").font(.title3); Text("תסריטים").font(.caption) }
+                                    .frame(maxWidth: .infinity, minHeight: 52)
+                            }.foregroundStyle(LensTheme.accent).accessibilityIdentifier("library-tab").accessibilityAddTraits(.isSelected)
+                            Button { showingTakes = true } label: {
+                                VStack(spacing: 5) { Image(systemName: "play.rectangle").font(.title3); Text("הטייקים שלי").font(.caption) }
+                                    .frame(maxWidth: .infinity, minHeight: 52)
+                            }.foregroundStyle(LensTheme.muted).accessibilityIdentifier("takes")
+                        }.padding(.horizontal, 20)
+                    }.padding(.top, 12).background(LensTheme.background)
+                        .overlay(alignment: .top) { Divider().overlay(LensTheme.divider) }
+                }
             }
             .navigationDestination(for: UUID.self) { id in
                 if let script = library.scripts.first(where: { $0.id == id }) { EditorView(library: library, initial: script) }
@@ -62,16 +83,17 @@ struct LibraryView: View {
                 Button("מחיקת תסריט", role: .destructive) { if let deleting { library.deleteScript(deleting) }; deleting = nil }
                 Button("ביטול", role: .cancel) { deleting = nil }
             }
-        }.tint(LensTheme.green).lensError($library.error)
+        }.tint(LensTheme.accent).lensError($library.error)
     }
 }
 
 private struct ScriptCard: View {
     let script: Script
+    let number: Int
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            if script.isSample { Text("תסריט לדוגמה").font(.caption2.weight(.medium)).padding(.horizontal, 9).padding(.vertical, 5).background(LensTheme.pale, in: Capsule()) }
-            Text(script.title.isEmpty ? "ללא כותרת" : script.title).font(.title3.bold())
+            Text(String(format: "%02d", number)).font(.subheadline.monospacedDigit()).foregroundStyle(LensTheme.muted)
+            Text(script.title.isEmpty ? "ללא כותרת" : script.title).font(.title2.bold()).multilineTextAlignment(.leading)
             Text(script.presentationText.isEmpty ? "עדיין אין כאן מלל" : script.presentationText).font(.subheadline).foregroundStyle(.secondary).lineLimit(2).lineSpacing(4)
             HStack {
                 if script.presentationMode == .talkingPoints {
@@ -79,51 +101,69 @@ private struct ScriptCard: View {
                 } else {
                     Text("\(script.wordCount) מילים · כ־\(LensTheme.time(script.settings.duration(wordCount: script.wordCount)))")
                 }
-                Spacer(); Image(systemName: "arrow.left")
-            }.font(.caption).foregroundStyle(LensTheme.green)
+                Spacer(); Image(systemName: "arrow.left").font(.headline).accessibilityHidden(true)
+            }.font(.caption).foregroundStyle(LensTheme.accent)
             Text(script.updatedAt, format: .dateTime.day().month().hour().minute()).font(.caption2).foregroundStyle(.tertiary)
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(20).background(.white, in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(LensTheme.green.opacity(0.1)))
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(20).background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(LensTheme.divider.opacity(0.65)))
     }
 }
 
 struct EditorView: View {
     @Bindable var library: LibraryModel
     @State private var script: Script
+    @FocusState private var focusedField: String?
+    @Environment(\.dynamicTypeSize) private var typeSize
     init(library: LibraryModel, initial: Script) { self.library = library; _script = State(initialValue: initial) }
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            TextField("שם התסריט", text: $script.title).font(.title2.bold()).accessibilityIdentifier("script-title")
-            Picker("אופן הצגת המלל", selection: $script.presentationMode) {
-                Text("טקסט לגלילה").tag(PresentationMode.scrolling)
-                Text("נקודות לדיבור").tag(PresentationMode.talkingPoints)
-            }.pickerStyle(.segmented).accessibilityIdentifier("presentation-mode")
-            if script.presentationMode == .talkingPoints {
-                Text("משפט שמזכיר לך מה להגיד בכל שלב. בצילום עוברים ביניהם בכפתור ״הבא״. אפשר להשאיר שלבים ריקים.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    TextField("שם התסריט", text: $script.title).focused($focusedField, equals: "title").font(.title2.bold()).padding(14)
+                        .background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 14)).accessibilityIdentifier("script-title")
+                    let choiceLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 4))
+                    choiceLayout {
+                        StudioChoice(title: "טקסט לגלילה", selected: script.presentationMode == .scrolling) { script.presentationMode = .scrolling }
+                        StudioChoice(title: "נקודות לדיבור", selected: script.presentationMode == .talkingPoints) { script.presentationMode = .talkingPoints }
+                    }.padding(4).background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 16))
+                        .accessibilityIdentifier("presentation-mode")
+                    if script.presentationMode == .talkingPoints {
+                        Text("משפט שמזכיר לך מה להגיד בכל שלב. בצילום עוברים ביניהם בכפתור ״הבא״. אפשר להשאיר שלבים ריקים.")
+                            .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         ForEach(TalkingStage.allCases, id: \.self) { stage in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(stage.title).font(.subheadline.weight(.semibold))
                                 TextField("המשפט שיזכיר לך", text: Binding(get: { script.pointText(for: stage) }, set: { script.setPointText($0, for: stage) }), axis: .vertical)
-                                    .font(.system(size: 19)).lineLimit(2...5).padding(12)
-                                    .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                                    .focused($focusedField, equals: stage.rawValue)
+                                    .font(.body).lineLimit(2...5).padding(12)
+                                    .background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 12))
                                     .accessibilityLabel(stage.title).accessibilityIdentifier("point-\(stage.rawValue)")
                             }
                         }
+                        Text("\(script.activeTalkingPoints.count) נקודות · שמירה אוטומטית במכשיר").font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("הדבק מלל שהעתקת במקבוק, או כתוב כאן.").font(.footnote).foregroundStyle(.secondary)
+                        TextEditor(text: $script.text).focused($focusedField, equals: "text").font(.body).lineSpacing(8).scrollContentBackground(.hidden)
+                            .frame(minHeight: max(220, geometry.size.height * 0.5))
+                            .padding(12).background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 16)).accessibilityIdentifier("script-text")
+                        Text("\(script.wordCount) מילים · שמירה אוטומטית במכשיר").font(.caption).foregroundStyle(.secondary)
                     }
-                }.scrollDismissesKeyboard(.interactively)
-                Text("\(script.activeTalkingPoints.count) נקודות · שמירה אוטומטית במכשיר").font(.caption).foregroundStyle(.secondary)
-            } else {
-                Text("הדבק מלל שהעתקת במקבוק, או כתוב כאן.").font(.footnote).foregroundStyle(.secondary)
-                TextEditor(text: $script.text).font(.system(size: 19)).lineSpacing(8).scrollContentBackground(.hidden)
-                    .padding(12).background(.white, in: RoundedRectangle(cornerRadius: 16)).accessibilityIdentifier("script-text")
-                Text("\(script.wordCount) מילים · שמירה אוטומטית במכשיר").font(.caption).foregroundStyle(.secondary)
+                }.padding(24)
+            }.scrollDismissesKeyboard(.interactively)
+                .safeAreaInset(edge: .bottom) {
+                    if focusedField == nil {
+                        NavigationLink { SetupView(library: library, script: $script) } label: { Text("ממשיכים להכנה") }
+                            .buttonStyle(MainButtonStyle()).disabled(!script.canStart).accessibilityIdentifier("prepare")
+                            .padding(.horizontal, 24).padding(.vertical, 12).background(LensTheme.background)
+                    }
+                }
+        }.background(LensTheme.background).foregroundStyle(LensTheme.text).navigationTitle("המלל שלך").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("סיום הקלדה") { focusedField = nil }.accessibilityIdentifier("dismiss-keyboard")
+                }
             }
-            NavigationLink { SetupView(library: library, script: $script) } label: { Text("ממשיכים להכנה ←") }
-                .buttonStyle(MainButtonStyle()).disabled(!script.canStart).opacity(script.canStart ? 1 : 0.5).accessibilityIdentifier("prepare")
-        }.padding(24).background(LensTheme.paper).navigationTitle("המלל שלך").navigationBarTitleDisplayMode(.inline)
             .onChange(of: script) { _, value in library.upsert(value) }
     }
 }
