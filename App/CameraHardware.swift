@@ -51,7 +51,7 @@ actor CameraHardware {
     nonisolated(unsafe) let session = AVCaptureSession()
     nonisolated let events: AsyncStream<CaptureEvent>
     private let delegate: MovieDelegate
-    private let output = AVCaptureMovieFileOutput()
+    private let output = CameraHardware.makeMovieOutput()
     private let meter = AVCaptureAudioDataOutput()
     private let meterDelegate = MeterDelegate()
     private let meterQueue = DispatchQueue(label: "personal.lensprompt.meter")
@@ -64,6 +64,14 @@ actor CameraHardware {
     init() {
         let stream = AsyncStream<CaptureEvent>.makeStream()
         events = stream.stream; delegate = MovieDelegate(stream.continuation)
+    }
+
+    nonisolated static func makeMovieOutput() -> AVCaptureMovieFileOutput {
+        let output = AVCaptureMovieFileOutput()
+        // Feedback starts recording immediately, before a preview has delivered
+        // its first frame. Prepare recording resources with the session itself.
+        if #available(iOS 26.0, *) { output.isDeferredStartEnabled = false }
+        return output
     }
 
     func preparePreview() throws {

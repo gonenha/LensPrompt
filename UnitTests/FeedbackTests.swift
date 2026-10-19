@@ -124,3 +124,10 @@ private final class NoVideoRequests: URLProtocol, @unchecked Sendable {
     #expect(message?.contains(AVFoundationErrorDomain) == true)
     #expect(message?.contains("Cannot Record") == true)
 }
+
+@Test func movieRecordingOutputStartsWithTheCaptureSession() {
+    if #available(iOS 26.0, *) {
+        let output = CameraHardware.makeMovieOutput()
+        #expect(!output.isDeferredStartEnabled)
+    }
+}
