@@ -138,6 +138,7 @@ struct EditorView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    fieldHeader("כותרת", text: script.title, field: "כותרת התסריט", identifier: "title")
                     TextField("שם התסריט", text: $script.title).focused($focusedField, equals: "title").font(.title2.bold()).padding(14)
                         .background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 14)).accessibilityIdentifier("script-title")
                     let choiceLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 4))
@@ -151,7 +152,7 @@ struct EditorView: View {
                             .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                         ForEach(TalkingStage.allCases, id: \.self) { stage in
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(stage.title).font(.subheadline.weight(.semibold))
+                                fieldHeader(stage.title, text: script.pointText(for: stage), field: stage.title, identifier: "point-" + stage.rawValue)
                                 TextField("המשפט שיזכיר לך", text: Binding(get: { script.pointText(for: stage) }, set: { script.setPointText($0, for: stage) }), axis: .vertical)
                                     .focused($focusedField, equals: stage.rawValue)
                                     .font(.body).lineLimit(2...5).padding(12)
@@ -162,6 +163,7 @@ struct EditorView: View {
                         Text("\(script.activeTalkingPoints.count) נקודות · שמירה אוטומטית במכשיר").font(.caption).foregroundStyle(.secondary)
                     } else {
                         Text("הדבק מלל שהעתקת במקבוק, או כתוב כאן.").font(.footnote).foregroundStyle(.secondary)
+                        fieldHeader("התסריט", text: script.text, field: "טקסט התסריט", identifier: "text")
                         TextEditor(text: $script.text).focused($focusedField, equals: "text").font(.body).lineSpacing(8).scrollContentBackground(.hidden)
                             .frame(minHeight: max(220, geometry.size.height * 0.5))
                             .padding(12).background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 16)).accessibilityIdentifier("script-text")
@@ -184,5 +186,13 @@ struct EditorView: View {
                 }
             }
             .onChange(of: script) { _, value in library.upsert(value) }
+    }
+    private func fieldHeader(_ title: String, text: String, field: String, identifier: String) -> some View {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout())
+        return layout {
+            Text(title).font(.subheadline.weight(.semibold))
+            if !typeSize.isAccessibilitySize { Spacer() }
+            CopyTextButton(text: text, field: field, identifier: identifier)
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 }
