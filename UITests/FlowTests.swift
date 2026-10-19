@@ -2,6 +2,38 @@ import XCTest
 
 final class FlowTests: XCTestCase {
     @MainActor
+    func testFeedbackExplainsCaptureAndRequiresExplicitModelVerification() {
+        let app = XCUIApplication(); app.launch()
+        let marker = "Feedback QA " + String(UUID().uuidString.prefix(4))
+        app.buttons["new-script"].tap()
+        app.textFields["script-title"].tap(); app.textFields["script-title"].typeText(marker)
+        app.buttons["dismiss-keyboard"].tap()
+        app.buttons["נקודות לדיבור"].tap()
+        let opening = app.descendants(matching: .any).matching(identifier: "point-opening").firstMatch
+        opening.tap(); app.typeText("A short rehearsal")
+        app.buttons["dismiss-keyboard"].tap(); app.buttons["prepare"].tap()
+        let feedback = app.buttons["feedback-practice"]
+        reveal(feedback, in: app, upwards: true); feedback.tap()
+        XCTAssertTrue(app.staticTexts["feedback-consent"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["start-feedback-capture"].exists)
+        XCTAssertFalse(app.buttons["request-feedback-analysis"].exists)
+        let settings = app.buttons["open-feedback-settings"]
+        reveal(settings, in: app, upwards: true); settings.tap()
+        XCTAssertTrue(app.textFields["feedback-model"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["verify-video"].exists)
+        XCTAssertFalse(app.buttons["ביטול הבדיקה"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "feedback-settings"; shot.lifetime = .keepAlways; add(shot)
+        app.buttons["סיום"].tap(); app.buttons["close-feedback"].tap()
+        XCTAssertTrue(app.navigationBars["לפני הטייק"].waitForExistence(timeout: 3))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let draft = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", marker)).firstMatch
+        draft.press(forDuration: 1)
+        app.buttons["מחיקה"].tap(); app.buttons["מחיקת תסריט"].tap()
+        XCTAssertTrue(draft.waitForNonExistence(timeout: 3))
+    }
+
+    @MainActor
     func testAISettingsAndMissingKeyDoNotCreateScripts() {
         let app = XCUIApplication(); app.launch()
         app.buttons["settings"].tap()

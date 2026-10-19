@@ -2,7 +2,7 @@ import Foundation
 import Security
 import PrompterCore
 
-enum AIProvider: String, CaseIterable, Identifiable {
+enum AIProvider: String, CaseIterable, Identifiable, Sendable {
     case openAI, gemini, claude
     var id: String { rawValue }
     var title: String { switch self { case .openAI: "OpenAI"; case .gemini: "Gemini"; case .claude: "Claude" } }

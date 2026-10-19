@@ -21,6 +21,7 @@ struct AISettingsView: View {
                     Text("מחיקת מפתח כאן מסירה אותו מהמכשיר. כדי לבטל אותו לגמרי יש לבטל אותו גם באתר הספק.")
                 }
                 Section("האולפן") {
+                    NavigationLink("משוב צילום · מודל ואימות וידאו") { FeedbackSettingsView() }.accessibilityIdentifier("feedback-settings")
                     Text("מהירות הגלילה, גודל הטקסט והספירה לאחור נשמרים בנפרד לכל תסריט במסך ״לפני הטייק״.")
                 }
             }.scrollContentBackground(.hidden).background(LensTheme.background).navigationTitle("הגדרות")
@@ -29,8 +30,9 @@ struct AISettingsView: View {
     }
 }
 
-private struct ProviderSettingsView: View {
+struct ProviderSettingsView: View {
     let provider: AIProvider
+    var showsTextModel = true
     @State private var key = ""
     @State private var model = ""
     @State private var saved = false
@@ -56,15 +58,22 @@ private struct ProviderSettingsView: View {
                     }.disabled(checking)
                 }
             }
-            Section("מודל") {
-                TextField("שם המודל", text: $model).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .environment(\.layoutDirection, .leftToRight).disabled(checking)
-                Text("אפשר לשנות לשם מודל אחר שהחשבון שלך מורשה להשתמש בו ושמתאים ליצירת טקסט מובנה.").font(.caption)
-                Button(checking ? "בודקים…" : "בדיקת חיבור וגישה למודל") { check() }
-                    .disabled(!saved || checking || !key.isEmpty)
-                if checking { ProgressView() }
-                if let status { Text(status).font(.footnote).accessibilityIdentifier("connection-status") }
-                Text("הבדיקה אינה מייצרת תסריט. הגישה ליצירה ולחיוב תאומת בבקשת היצירה עצמה.").font(.caption)
+            if showsTextModel {
+                Section("מודל") {
+                    TextField("שם המודל", text: $model).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .environment(\.layoutDirection, .leftToRight).disabled(checking)
+                    Text("אפשר לשנות לשם מודל אחר שהחשבון שלך מורשה להשתמש בו ושמתאים ליצירת טקסט מובנה.").font(.caption)
+                    Button(checking ? "בודקים…" : "בדיקת חיבור וגישה למודל") { check() }
+                        .disabled(!saved || checking || !key.isEmpty)
+                    if checking { ProgressView() }
+                    if let status { Text(status).font(.footnote).accessibilityIdentifier("connection-status") }
+                    Text("הבדיקה אינה מייצרת תסריט. הגישה ליצירה ולחיוב תאומת בבקשת היצירה עצמה.").font(.caption)
+                }
+            } else {
+                Section("משוב צילום") {
+                    Text("זהו המפתח של הספק. מודל המשוב נבחר ונבדק במסך הקודם, בנפרד ממודל יצירת התסריטים.").font(.footnote)
+                    if let status { Text(status).font(.footnote) }
+                }
             }
         }.scrollContentBackground(.hidden).background(LensTheme.background).navigationTitle(provider.title)
             .onAppear {
