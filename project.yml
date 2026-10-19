@@ -1,0 +1,69 @@
+name: LensPrompt
+options:
+  bundleIdPrefix: personal.lensprompt
+  deploymentTarget:
+    iOS: '17.0'
+packages:
+  PrompterCore:
+    path: Core
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    TARGETED_DEVICE_FAMILY: '1'
+    IPHONEOS_DEPLOYMENT_TARGET: '17.0'
+    CURRENT_PROJECT_VERSION: '1'
+    MARKETING_VERSION: '0.1.0'
+targets:
+  LensPrompt:
+    type: application
+    platform: iOS
+    sources: [App]
+    dependencies:
+      - package: PrompterCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: מול העדשה
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
+        NSCameraUsageDescription: המצלמה משמשת לצילום הסרטונים שלך עם פרומפטר על המסך.
+        NSMicrophoneUsageDescription: המיקרופון משמש להקלטת הקול בסרטונים ולמעקב משוער אחרי הדיבור בזמן צילום או תרגול.
+        NSPhotoLibraryAddUsageDescription: שמירת הסרטונים שבחרת בספריית התמונות שלך.
+        CFBundleLocalizations: [he, en]
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: personal.lensprompt.app
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+  LensPromptUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: LensPrompt
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  LensPromptTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [UnitTests]
+    dependencies:
+      - target: LensPrompt
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  LensPrompt:
+    build:
+      targets:
+        LensPrompt: all
+        LensPromptUITests: [test]
+        LensPromptTests: [test]
+    test:
+      targets: [LensPromptTests, LensPromptUITests]
+      gatherCoverageData: false
