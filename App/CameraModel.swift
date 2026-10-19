@@ -51,13 +51,22 @@ final class CameraModel {
         return false
         #else
         let video = await permission(.video)
+        guard !Task.isCancelled else { return false }
         let audio = video ? await permission(.audio) : false
+        guard !Task.isCancelled else { return false }
         guard video && audio else { permissionDenied = true; error = CameraFailure.permission.localizedDescription; return false }
         permissionDenied = false
         do {
-            try await hardware.preparePreview(); try await hardware.prepareMicrophone()
+            try Task.checkCancellation()
+            try await hardware.preparePreview()
+            try Task.checkCancellation()
+            try await hardware.prepareMicrophone()
+            try Task.checkCancellation()
             previewAvailable = true; notice = nil; return true
-        } catch { self.error = error.localizedDescription; return false }
+        } catch {
+            if Task.isCancelled { await suspendPreview(); return false }
+            self.error = error.localizedDescription; return false
+        }
         #endif
     }
 

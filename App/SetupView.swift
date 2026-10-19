@@ -7,6 +7,7 @@ struct SetupView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var camera = CameraModel()
     @State private var presenting = false
+    @State private var preparation = CapturePreparation()
     @State private var practice = true
     @State private var voicePermissionDenied = false
     @Environment(\.scenePhase) private var scenePhase
@@ -100,41 +101,48 @@ struct SetupView: View {
                 }
                 Button {
                     script.settings = script.settings.validated()
-                    Task { if await camera.prepareRecording() { practice = false; presenting = true } }
+                    preparation.begin(operation: { await camera.prepareRecording() }, ready: { practice = false; presenting = true })
                 } label: { Label("התחלת צילום", systemImage: "record.circle") }.buttonStyle(MainButtonStyle())
-                    .disabled(camera.preparing || !script.canStart).accessibilityIdentifier("record")
+                    .disabled(preparation.busy || camera.preparing || !script.canStart).accessibilityIdentifier("record")
                 Button {
                     script.settings = script.settings.validated()
-                    Task {
-                        if script.presentationMode == .scrolling && script.settings.followsVoice {
-                            guard await camera.allowVoicePractice() else { voicePermissionDenied = true; return }
-                        }
-                        practice = true; presenting = true
-                    }
+                    startPractice()
                 } label: { Label("תרגול ללא צילום", systemImage: "play") }
-                    .buttonStyle(MainButtonStyle(secondary: true)).disabled(!script.canStart).accessibilityIdentifier("rehearse")
+                    .buttonStyle(MainButtonStyle(secondary: true)).disabled(preparation.busy || !script.canStart).accessibilityIdentifier("rehearse")
                 if camera.permissionDenied {
                     Button("פתיחת הגדרות הרשאות") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }.font(.footnote)
                 }
             }.padding(24)
         }.background(LensTheme.background).foregroundStyle(LensTheme.text).tint(LensTheme.accent).navigationTitle("לפני הטייק").navigationBarTitleDisplayMode(.inline)
+            .overlay { if preparation.busy { BrandLoadingView(title: "מכינים את האולפן…", cancel: { preparation.cancel() }) } }
             .task { await camera.preparePreviewIfAuthorized() }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active && !presenting { Task { await camera.preparePreviewIfAuthorized() } }
-                else if phase == .background && !presenting { Task { await camera.suspendPreview() } }
+                if phase == .active && !presenting && !preparation.busy { Task { await camera.preparePreviewIfAuthorized() } }
+                else if phase == .background && !presenting { preparation.cancel(); Task { await camera.suspendPreview() } }
             }
-            .onDisappear { if !presenting { Task { await camera.suspendPreview() } } }
+            .onDisappear { if !presenting { preparation.cancel(); Task { await camera.suspendPreview() } } }
             .fullScreenCover(isPresented: $presenting, onDismiss: { Task { await camera.preparePreviewIfAuthorized() } }) {
                 RecordingView(library: library, script: $script, camera: camera, practice: practice)
+                    .onAppear { preparation.didPresent() }
                     .environment(\.layoutDirection, .rightToLeft).environment(\.locale, Locale(identifier: "he_IL"))
             }
             .alert("נדרשת גישה למיקרופון למעקב לפי קול", isPresented: $voicePermissionDenied) {
-                Button("תרגול בגלילה רגילה") { script.settings.followsVoice = false; practice = true; presenting = true }
+                Button("תרגול בגלילה רגילה") { script.settings.followsVoice = false; startPractice() }
                 Button("ביטול", role: .cancel) {}
             } message: { Text("אפשר לאפשר גישה בהגדרות האייפון, או לתרגל בלי מעקב לפי קול.") }
             .lensError($camera.error)
     }
 
+    private func startPractice() {
+        preparation.begin(operation: {
+            if script.presentationMode == .scrolling && script.settings.followsVoice {
+                let allowed = await camera.allowVoicePractice()
+                guard !Task.isCancelled else { return false }
+                guard allowed else { voicePermissionDenied = true; return false }
+            }
+            return true
+        }, ready: { practice = true; presenting = true })
+    }
     private func settingLabel(_ title: String, value: String? = nil) -> some View {
         HStack { Text(title).font(.subheadline.weight(.semibold)); Spacer(); if let value { Text(value).font(.caption).foregroundStyle(.secondary) } }
     }

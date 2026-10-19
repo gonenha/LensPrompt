@@ -9,6 +9,7 @@ struct LibraryView: View {
     @State private var showingTakes = false
     @State private var takeScriptFilter: UUID?
     @State private var deleting: Script?
+    @State private var settings = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -35,7 +36,8 @@ struct LibraryView: View {
                         ContentUnavailableView("התסריטים לא נטענו", systemImage: "exclamationmark.triangle", description: Text("לא שינינו את הקבצים שלך."))
                         Button("ניסיון נוסף") { library.reload() }.buttonStyle(MainButtonStyle())
                     } else {
-                        ForEach(Array(library.scripts.enumerated()), id: \.element.id) { index, script in
+                        ForEach(Array(library.scriptFamilies.enumerated()), id: \.element.id) { index, family in
+                            let script = family.scripts[0]
                             VStack(spacing: 0) {
                             Button { path.append(script.id) } label: { ScriptCard(script: script, number: index + 1) }
                                 .buttonStyle(.plain)
@@ -43,6 +45,21 @@ struct LibraryView: View {
                                 .contextMenu {
                                     Button("שכפול", systemImage: "doc.on.doc") { library.duplicate(script) }
                                     Button("מחיקה", systemImage: "trash", role: .destructive) { deleting = script }
+                                }
+                                ForEach(Array(family.scripts.dropFirst())) { variant in
+                                    Button { path.append(variant.id) } label: {
+                                        HStack {
+                                            Image(systemName: "sparkles")
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(variant.scriptStyle?.title ?? variant.title)
+                                                Text("\(library.takes(for: variant.id).count) טייקים").font(.caption).foregroundStyle(LensTheme.muted)
+                                            }
+                                            Spacer(); Image(systemName: "chevron.left")
+                                        }.font(.subheadline).foregroundStyle(LensTheme.accent).padding(16)
+                                    }.buttonStyle(.plain).accessibilityIdentifier("script-" + variant.id.uuidString)
+                                        .contextMenu {
+                                            Button("מחיקה", systemImage: "trash", role: .destructive) { deleting = variant }
+                                        }
                                 }
                                 let count = library.takes(for: script.id).count
                                 if count > 0 {
@@ -74,6 +91,7 @@ struct LibraryView: View {
                                     .font(.subheadline).frame(maxWidth: .infinity, minHeight: 48)
                             }
                         }
+                        Button { settings = true } label: { Label("הגדרות", systemImage: "gearshape").font(.subheadline).frame(minHeight: 44) }.accessibilityIdentifier("settings")
                         HStack(spacing: 24) {
                             Button {} label: {
                                 VStack(spacing: 5) { Image(systemName: "doc.text.fill").font(.title3); Text("תסריטים").font(.caption) }
@@ -97,6 +115,7 @@ struct LibraryView: View {
                 case .failure(let error): library.error = error.localizedDescription
                 }
             }
+            .sheet(isPresented: $settings) { AISettingsView() }
             .sheet(isPresented: $showingTakes) { TakesView(library: library, scriptFilter: takeScriptFilter) }
             .confirmationDialog("למחוק את התסריט?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
                 Button("מחיקת תסריט", role: .destructive) { if let deleting { library.deleteScript(deleting) }; deleting = nil }
@@ -131,6 +150,7 @@ private struct ScriptCard: View {
 struct EditorView: View {
     @Bindable var library: LibraryModel
     @State private var script: Script
+    @State private var styles = false
     @FocusState private var focusedField: String?
     @Environment(\.dynamicTypeSize) private var typeSize
     init(library: LibraryModel, initial: Script) { self.library = library; _script = State(initialValue: initial) }
@@ -138,6 +158,18 @@ struct EditorView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    Button { focusedField = nil; styles = true } label: { Label("יצירת גרסאות עם בינה", systemImage: "sparkles") }.accessibilityIdentifier("script-styles")
+                    let familyID = script.sourceScriptID ?? script.id
+                    let family = library.scripts.filter { ($0.sourceScriptID ?? $0.id) == familyID && $0.id != script.id }
+                    if !family.isEmpty {
+                        DisclosureGroup("המקור והגרסאות שלי") {
+                            ForEach(family) { member in
+                                NavigationLink { EditorView(library: library, initial: member) } label: {
+                                    Text(member.scriptStyle?.title ?? "המקור").frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10)
+                                }
+                            }
+                        }.font(.subheadline)
+                    }
                     fieldHeader("כותרת", text: script.title, field: "כותרת התסריט", identifier: "title")
                     TextField("שם התסריט", text: $script.title).focused($focusedField, equals: "title").font(.title2.bold()).padding(14)
                         .background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 14)).accessibilityIdentifier("script-title")
@@ -185,6 +217,7 @@ struct EditorView: View {
                     Button("סיום הקלדה") { focusedField = nil }.accessibilityIdentifier("dismiss-keyboard")
                 }
             }
+            .sheet(isPresented: $styles) { ScriptStylesView(library: library, source: script) }
             .onChange(of: script) { _, value in library.upsert(value) }
     }
     private func fieldHeader(_ title: String, text: String, field: String, identifier: String) -> some View {
