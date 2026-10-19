@@ -7,6 +7,7 @@ struct LibraryView: View {
     @State private var path: [UUID] = []
     @State private var importing = false
     @State private var showingTakes = false
+    @State private var takeScriptFilter: UUID?
     @State private var deleting: Script?
 
     var body: some View {
@@ -27,6 +28,7 @@ struct LibraryView: View {
                         Button("ניסיון נוסף") { library.reload() }.buttonStyle(MainButtonStyle())
                     } else {
                         ForEach(Array(library.scripts.enumerated()), id: \.element.id) { index, script in
+                            VStack(spacing: 0) {
                             Button { path.append(script.id) } label: { ScriptCard(script: script, number: index + 1) }
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier(script.isSample ? "sample-script" : "script-\(script.id)")
@@ -34,6 +36,15 @@ struct LibraryView: View {
                                     Button("שכפול", systemImage: "doc.on.doc") { library.duplicate(script) }
                                     Button("מחיקה", systemImage: "trash", role: .destructive) { deleting = script }
                                 }
+                                let count = library.takes(for: script.id).count
+                                if count > 0 {
+                                    Button { takeScriptFilter = script.id; showingTakes = true } label: {
+                                        HStack { Image(systemName: "film.stack"); Text("\(count) טייקים לתסריט"); Spacer(); Image(systemName: "chevron.left") }
+                                            .font(.subheadline).foregroundStyle(LensTheme.accent).padding(16)
+                                    }.buttonStyle(.plain).accessibilityIdentifier("script-takes-" + script.id.uuidString)
+                                }
+                            }.background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 20))
+
                         }
                         if library.scripts.isEmpty { Text("כאן יופיעו התסריטים שלך.").foregroundStyle(.secondary).padding(.vertical, 25) }
 
@@ -60,7 +71,7 @@ struct LibraryView: View {
                                 VStack(spacing: 5) { Image(systemName: "doc.text.fill").font(.title3); Text("תסריטים").font(.caption) }
                                     .frame(maxWidth: .infinity, minHeight: 52)
                             }.foregroundStyle(LensTheme.accent).accessibilityIdentifier("library-tab").accessibilityAddTraits(.isSelected)
-                            Button { showingTakes = true } label: {
+                            Button { takeScriptFilter = nil; showingTakes = true } label: {
                                 VStack(spacing: 5) { Image(systemName: "play.rectangle").font(.title3); Text("הטייקים שלי").font(.caption) }
                                     .frame(maxWidth: .infinity, minHeight: 52)
                             }.foregroundStyle(LensTheme.muted).accessibilityIdentifier("takes")
@@ -78,7 +89,7 @@ struct LibraryView: View {
                 case .failure(let error): library.error = error.localizedDescription
                 }
             }
-            .sheet(isPresented: $showingTakes) { TakesView(library: library) }
+            .sheet(isPresented: $showingTakes) { TakesView(library: library, scriptFilter: takeScriptFilter) }
             .confirmationDialog("למחוק את התסריט?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
                 Button("מחיקת תסריט", role: .destructive) { if let deleting { library.deleteScript(deleting) }; deleting = nil }
                 Button("ביטול", role: .cancel) { deleting = nil }

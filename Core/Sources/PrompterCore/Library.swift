@@ -37,9 +37,43 @@ public struct ScriptLibrary: Sendable {
     }
     public func loadTakes() throws -> [Take] { try read("takes.json", as: [Take].self, missing: []).sorted { $0.createdAt > $1.createdAt } }
     public func movieURL(for take: Take) -> URL { root.appendingPathComponent("Takes").appendingPathComponent(take.fileName) }
-    public func beginTake(scriptTitle: String) throws -> Take {
-        var takes = try loadTakes(); let take = Take(scriptTitle: scriptTitle)
+    // Only metadata is migrated; historical movie paths remain untouched.
+    public func prepareTakeCatalog(scripts: [Script]) throws -> [Take] {
+        let original = try loadTakes()
+        var takes = original
+        let oldSequences = try read("take-sequences.json", as: [String: Int].self, missing: [:])
+        var sequences = oldSequences
+        for index in takes.indices where takes[index].takeNumber == nil {
+            let matches = scripts.filter { $0.title == takes[index].scriptTitle }
+            if matches.count == 1 { takes[index].scriptID = matches[0].id }
+        }
+        for take in takes { sequences[take.groupID] = max(sequences[take.groupID] ?? 0, take.takeNumber ?? 0) }
+        for index in takes.indices.sorted(by: {
+            if takes[$0].createdAt == takes[$1].createdAt { return takes[$0].id.uuidString < takes[$1].id.uuidString }
+            return takes[$0].createdAt < takes[$1].createdAt
+        }) where takes[index].takeNumber == nil {
+            let key = takes[index].groupID
+            let next = (sequences[key] ?? 0) + 1
+            takes[index].takeNumber = next; sequences[key] = next
+        }
+        // Reserve sequence numbers first. A failed metadata write can leave a gap, never reuse.
+        if sequences != oldSequences { try write(sequences, to: "take-sequences.json") }
+        if takes != original { try write(takes, to: "takes.json") }
+        return takes
+    }
+    public func beginTake(scriptID: UUID? = nil, scriptTitle: String) throws -> Take {
+        var takes = try prepareTakeCatalog(scripts: loadScripts())
+        var sequences = try read("take-sequences.json", as: [String: Int].self, missing: [:])
+        var take = Take(scriptTitle: scriptTitle); take.scriptID = scriptID
+        take.takeNumber = (sequences[take.groupID] ?? 0) + 1
+        sequences[take.groupID] = take.takeNumber
+        try write(sequences, to: "take-sequences.json")
+        take.storedFileName = take.id.uuidString + "/" + take.exportFileName
+        try FileManager.default.createDirectory(at: movieURL(for: take).deletingLastPathComponent(), withIntermediateDirectories: true)
         takes.insert(take, at: 0); try write(takes, to: "takes.json"); return take
+    }
+    public func setRating(id: UUID, rating: TakeRating) throws {
+        try updateTake(id: id) { $0.rating = rating }
     }
     public func finishTake(id: UUID, duration: Double, interrupted: Bool) throws {
         try updateTake(id: id) { take in

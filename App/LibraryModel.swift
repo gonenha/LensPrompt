@@ -12,6 +12,26 @@ final class LibraryModel {
     var takesLoaded = false
     var inboxSuspended = false
     var bridgeNotice: String?
+    @ObservationIgnored private let exports = TakeExportStore()
+    var takeGroups: [TakeGroup] {
+        Dictionary(grouping: takes, by: \.groupID).map { _, members in
+            let title = members.first?.scriptID.flatMap { id in scripts.first(where: { $0.id == id })?.title } ?? members.first?.scriptTitle ?? ""
+            return TakeGroup(takes: members, title: title.isEmpty ? "ללא כותרת" : title)
+        }.sorted { ($0.takes.map(\.createdAt).max() ?? .distantPast) > ($1.takes.map(\.createdAt).max() ?? .distantPast) }
+    }
+    func takes(for scriptID: UUID) -> [Take] { takes.filter { $0.scriptID == scriptID } }
+
+    @discardableResult func rateTake(_ take: Take, rating: TakeRating) -> Bool {
+        do { try disk.setRating(id: take.id, rating: rating); reloadTakes(); return true }
+        catch { self.error = "לא ניתן לשמור את הדירוג. " + error.localizedDescription; return false }
+    }
+    func prepareShare(_ takes: [Take]) async throws -> TakeShareBatch {
+        try Task.checkCancellation()
+        let batch = try await exports.prepare(takes: takes, libraryRoot: disk.root, exportRoot: URL.cachesDirectory.appendingPathComponent("TakeExports"))
+        guard !Task.isCancelled else { await exports.release(batch); throw CancellationError() }
+        return batch
+    }
+    func releaseShare(_ batch: TakeShareBatch) async { await exports.release(batch) }
     private var hasUnsavedChanges = false
 
     func receiveCodexInbox() {
@@ -40,7 +60,7 @@ final class LibraryModel {
     }
 
     func reloadTakes() {
-        do { takes = try disk.loadTakes(); takesLoaded = true }
+        do { takes = scriptsLoaded ? try disk.prepareTakeCatalog(scripts: scripts) : try disk.loadTakes(); takesLoaded = true }
         catch { takesLoaded = false; self.error = "לא ניתן לטעון את רשימת הטייקים. \(error.localizedDescription)" }
     }
 
