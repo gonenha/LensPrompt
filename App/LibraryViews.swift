@@ -15,8 +15,16 @@ struct LibraryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(spacing: 12) {
-                        Image(systemName: "viewfinder").font(.system(size: 32, weight: .medium)).foregroundStyle(LensTheme.accent)
-                        Text("מול העדשה").font(.largeTitle.bold())
+                        Image("LensLogo").resizable().scaledToFit().frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 14)).accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("מול העדשה").font(.largeTitle.bold()).fixedSize(horizontal: false, vertical: true)
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                Text("by").foregroundStyle(LensTheme.muted)
+                                (Text("Gig").foregroundColor(Color(red: 195/255, green: 238/255, blue: 43/255)) + Text("lo").foregroundColor(LensTheme.text) + Text(".").foregroundColor(Color(red: 1, green: 79/255, blue: 53/255))).fontWeight(.heavy)
+                            }.font(.caption).environment(\.layoutDirection, .leftToRight)
+                                .accessibilityElement(children: .ignore).accessibilityLabel("מבית גיגלו")
+                        }
                     }.padding(.top, 14).padding(.bottom, 12)
                     Text("מוכנים לטייק הבא?").font(.title2.bold()).padding(.bottom, 8)
                     if let notice = library.bridgeNotice {
