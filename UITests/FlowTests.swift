@@ -190,7 +190,7 @@ final class FlowTests: XCTestCase {
         let app = XCUIApplication(); app.launch(); app.buttons["takes"].tap()
         let fixture = app.staticTexts["בדיקת סרטון — סימולטור"]
         XCTAssertTrue(fixture.waitForExistence(timeout: 3))
-        fixture.tap()
+        app.otherElements["take-group-legacy-בדיקת סרטון — סימולטור"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "open-take-")).firstMatch.tap()
         XCTAssertTrue(app.buttons["play-take"].waitForExistence(timeout: 5))
         app.buttons["play-take"].tap()
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "take-review-player"; shot.lifetime = .keepAlways; add(shot)
@@ -200,6 +200,35 @@ final class FlowTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["הטייקים שלי"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.staticTexts["בדיקת סרטון — סימולטור"].exists)
         app.buttons["סיום"].tap(); XCTAssertTrue(app.buttons["new-script"].exists)
+    }
+
+    @MainActor
+    func testGroupedTakesCanRateAndShareTwoTogether() {
+        let app = XCUIApplication(); app.launch(); app.buttons["takes"].tap()
+        let groupID = "script-A580DC69-2F6D-48EB-AFCF-5417C3D0865E"
+        let group = app.otherElements["take-group-" + groupID]
+        XCTAssertTrue(group.waitForExistence(timeout: 5))
+        let opens = group.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "open-take-"))
+        XCTAssertEqual(opens.count, 2)
+        opens.firstMatch.tap()
+        reveal(app.buttons["rating-excellent"], in: app, upwards: true)
+        app.buttons["rating-excellent"].tap()
+        XCTAssertTrue(app.staticTexts["דירוג: מעולה"].exists)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(group.staticTexts["מעולה"].exists)
+        let groupShot = XCTAttachment(screenshot: app.screenshot()); groupShot.name = "grouped-takes"; groupShot.lifetime = .keepAlways; add(groupShot)
+        app.buttons["select-takes"].tap()
+        let selections = group.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "select-take-"))
+        selections.element(boundBy: 0).tap(); selections.element(boundBy: 1).tap()
+        app.buttons["share-selected"].tap()
+        XCTAssertTrue(app.staticTexts["שיתוף 2 סרטונים"].waitForExistence(timeout: 5))
+        app.buttons["close-share"].tap()
+        app.buttons["select-takes"].tap()
+        opens.firstMatch.tap()
+        reveal(app.buttons["rating-good"], in: app, upwards: true)
+        XCTAssertTrue(app.staticTexts["דירוג: מעולה"].exists)
+        app.buttons["rating-good"].tap()
+        XCTAssertTrue(app.staticTexts["דירוג: טוב"].exists)
     }
 
     @MainActor

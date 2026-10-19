@@ -307,6 +307,16 @@ import SwiftUI
     let fixture = try simulatorStore.beginTake(scriptTitle: "בדיקת סרטון — סימולטור")
     try FileManager.default.copyItem(at: url, to: simulatorStore.movieURL(for: fixture))
     try simulatorStore.finishTake(id: fixture.id, duration: model.reviewableTake?.duration ?? 1, interrupted: false)
+    let groupID = UUID(uuidString: "A580DC69-2F6D-48EB-AFCF-5417C3D0865E")!
+    let groupedScript = Script(id: groupID, title: "בדיקת קבוצת טייקים", text: "מלל לבדיקה")
+    var scripts = try simulatorStore.loadScripts().filter { $0.id != groupID }
+    scripts.append(groupedScript); try simulatorStore.saveScripts(scripts)
+    for existing in try simulatorStore.loadTakes() where existing.scriptID == groupID { try simulatorStore.deleteTake(id: existing.id) }
+    for _ in 0..<2 {
+        let groupedTake = try simulatorStore.beginTake(scriptID: groupID, scriptTitle: groupedScript.title)
+        try FileManager.default.copyItem(at: url, to: simulatorStore.movieURL(for: groupedTake))
+        try simulatorStore.finishTake(id: groupedTake.id, duration: 1, interrupted: false)
+    }
     #endif
 }
 
@@ -323,4 +333,25 @@ import SwiftUI
     let afterDismiss = await model.prepareRetake()
     #expect(!afterDismiss)
     #expect(!model.playback.isRunning)
+}
+
+@Test @MainActor func groupedTakesAndRatingsReloadFromDisk() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = LibraryModel(disk: try ScriptLibrary(root: root))
+    let script = Script(title: "אותו תסריט")
+    let twin = Script(title: script.title)
+    library.upsert(script); library.upsert(twin)
+    let first = try library.disk.beginTake(scriptID: script.id, scriptTitle: script.title)
+    _ = try library.disk.beginTake(scriptID: script.id, scriptTitle: script.title)
+    _ = try library.disk.beginTake(scriptID: twin.id, scriptTitle: twin.title)
+    library.reloadTakes()
+    #expect(library.takeGroups.count == 2)
+    #expect(library.takes(for: script.id).count == 2)
+    #expect(library.rateTake(first, rating: .good))
+    #expect(LibraryModel(disk: library.disk).takes.first(where: { $0.id == first.id })?.rating == .good)
+    #expect(library.rateTake(first, rating: .poor))
+    #expect(library.takes.first(where: { $0.id == first.id })?.rating == .poor)
+    var renamed = script; renamed.title = "שם חדש"; library.upsert(renamed)
+    #expect(library.takeGroups.first(where: { $0.scriptID == script.id })?.title == "שם חדש")
 }

@@ -128,13 +128,50 @@ public struct Script: Identifiable, Codable, Equatable, Sendable {
 }
 
 public enum TakeStatus: String, Codable, Sendable { case pending, ready, interrupted, failed }
+public enum TakeRating: String, Codable, CaseIterable, Sendable {
+    case excellent, good, poor
+    public var title: String {
+        switch self { case .excellent: "מעולה"; case .good: "טוב"; case .poor: "גרוע" }
+    }
+}
+
+public struct TakeGroup: Identifiable, Sendable {
+    public let id: String
+    public let scriptID: UUID?
+    public let title: String
+    public let takes: [Take]
+    public init(takes: [Take], title: String) {
+        self.takes = takes.sorted { ($0.takeNumber ?? 0) < ($1.takeNumber ?? 0) }
+        id = takes.first?.groupID ?? ""; scriptID = takes.first?.scriptID; self.title = title
+    }
+}
+
 public struct Take: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public let scriptTitle: String
     public let createdAt: Date
     public var duration: Double
     public var status: TakeStatus
-    public var fileName: String { id.uuidString + ".mov" }
+    public var scriptID: UUID?
+    public var takeNumber: Int?
+    public var rating: TakeRating?
+    public var storedFileName: String?
+    public var groupID: String { scriptID.map { "script-" + $0.uuidString } ?? "legacy-" + scriptTitle }
+    public var label: String { "טייק \(takeNumber ?? 1)" }
+    public var exportFileName: String {
+        let forbidden = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/\\:"))
+        let clean = scriptTitle.components(separatedBy: forbidden).filter { !$0.isEmpty }.joined(separator: " ")
+        let suffix = " — " + label + ".mov"
+        var prefix = "", byteCount = 0
+        for character in clean {
+            let count = String(character).utf8.count
+            guard byteCount + count <= 255 - suffix.utf8.count else { break }
+            prefix.append(character); byteCount += count
+        }
+        let trimmed = prefix.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
+        return (trimmed.isEmpty ? "ללא כותרת" : trimmed) + suffix
+    }
+    public var fileName: String { storedFileName ?? id.uuidString + ".mov" }
     public init(scriptTitle: String) {
         id = UUID(); self.scriptTitle = scriptTitle; createdAt = .now; duration = 0; status = .pending
     }

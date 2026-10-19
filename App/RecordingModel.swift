@@ -88,7 +88,7 @@ final class RecordingModel {
             do {
                 let capacity = try self.library.disk.root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage ?? 0
                 guard capacity > 200_000_000 else { throw CameraFailure.space }
-                let take = try self.library.disk.beginTake(scriptTitle: self.script.title)
+                let take = try self.library.disk.beginTake(scriptID: self.script.id, scriptTitle: self.script.title)
                 self.take = take; self.library.reloadTakes()
                 try await self.camera.startMovie(at: self.library.disk.movieURL(for: take))
             } catch {

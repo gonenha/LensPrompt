@@ -334,3 +334,89 @@ private func stageBridge(_ data: Data, id: UUID, store: ScriptLibrary, ready: Bo
     #expect(try store.loadTakes().map(\.id) == [other.id])
     #expect(try store.loadScripts().count == 1)
 }
+
+@Test func takeCatalogPreservesIdentityNumbersRatingsAndLegacyMovies() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let disk = try ScriptLibrary(root: root)
+    let script = Script(title: "אותו שם", text: "א")
+    let twin = Script(title: "אותו שם", text: "ב")
+    try disk.saveScripts([script, twin])
+    let first = try disk.beginTake(scriptID: script.id, scriptTitle: script.title)
+    let second = try disk.beginTake(scriptID: script.id, scriptTitle: script.title)
+    let other = try disk.beginTake(scriptID: twin.id, scriptTitle: twin.title)
+    #expect(first.takeNumber == 1); #expect(second.takeNumber == 2); #expect(other.takeNumber == 1)
+    #expect(first.groupID != other.groupID)
+    #expect(disk.movieURL(for: first).lastPathComponent == "אותו שם — טייק 1.mov")
+    try disk.setRating(id: first.id, rating: .excellent)
+    #expect(try disk.loadTakes().first(where: { $0.id == first.id })?.rating == .excellent)
+    try disk.deleteTake(id: second.id)
+    let reopened = try ScriptLibrary(root: root)
+    let next = try reopened.beginTake(scriptID: script.id, scriptTitle: "שם חדש")
+    #expect(next.takeNumber == 3); #expect(next.groupID == first.groupID)
+    #expect(next.exportFileName == "שם חדש — טייק 3.mov")
+}
+
+@Test func legacyTakeMigrationIsStableAndDoesNotMoveMovies() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let disk = try ScriptLibrary(root: root)
+    let script = Script(title: "ישן")
+    let one = Take(scriptTitle: "ישן"), two = Take(scriptTitle: "ישן")
+    let encoder = JSONEncoder()
+    var json = try #require(JSONSerialization.jsonObject(with: encoder.encode([one,two])) as? [[String: Any]])
+    for i in json.indices { for key in ["scriptID","takeNumber","rating","storedFileName"] { json[i].removeValue(forKey: key) } }
+    try JSONSerialization.data(withJSONObject: json).write(to: root.appendingPathComponent("takes.json"))
+    let original = disk.movieURL(for: one)
+    try Data([7]).write(to: original)
+    let migrated = try disk.prepareTakeCatalog(scripts: [script])
+    #expect(migrated.allSatisfy { $0.scriptID == script.id && $0.takeNumber != nil && $0.rating == nil })
+    #expect(Set(migrated.compactMap(\.takeNumber)) == [1,2])
+    #expect(try Data(contentsOf: original) == Data([7]))
+    #expect(try disk.prepareTakeCatalog(scripts: [script]) == migrated)
+    let ambiguousRoot = root.appendingPathComponent("Ambiguous")
+    let ambiguous = try ScriptLibrary(root: ambiguousRoot)
+    try JSONSerialization.data(withJSONObject: json).write(to: ambiguousRoot.appendingPathComponent("takes.json"))
+    let unresolved = try ambiguous.prepareTakeCatalog(scripts: [script, Script(title: script.title)])
+    #expect(unresolved.allSatisfy { $0.scriptID == nil })
+    #expect(Set(unresolved.map(\.groupID)).count == 1)
+    #expect(try ambiguous.prepareTakeCatalog(scripts: [script]).allSatisfy { $0.scriptID == nil })
+    try disk.deleteTake(id: two.id); try disk.deleteTake(id: one.id)
+    #expect(try disk.beginTake(scriptID: script.id, scriptTitle: script.title).takeNumber == 3)
+}
+
+@Test func ambiguousLegacyTitlesRemainSeparateAndExportAllWithSafeNames() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let disk = try ScriptLibrary(root: root)
+    let title = "../שלום:/\nעולם"
+    let first = try disk.beginTake(scriptTitle: title)
+    let second = try disk.beginTake(scriptTitle: title)
+    try Data([1,2]).write(to: disk.movieURL(for: first)); try Data([3,4]).write(to: disk.movieURL(for: second))
+    let store = TakeExportStore()
+    let batch = try await store.prepare(takes: [first, second], libraryRoot: root, exportRoot: root.appendingPathComponent("Exports"))
+    #expect(batch.urls.count == 2)
+    #expect(batch.urls[0].lastPathComponent.contains("טייק 1"))
+    #expect(!batch.urls[0].lastPathComponent.contains("/")); #expect(!batch.urls[0].lastPathComponent.contains("\n"))
+    #expect(try Data(contentsOf: batch.urls[0]) == Data([1,2]))
+    #expect(try Data(contentsOf: batch.urls[1]) == Data([3,4]))
+    await store.release(batch)
+    #expect(FileManager.default.fileExists(atPath: disk.movieURL(for: first).path))
+    try FileManager.default.removeItem(at: disk.movieURL(for: second))
+    await #expect(throws: (any Error).self) { try await store.prepare(takes: [first,second], libraryRoot: root, exportRoot: root.appendingPathComponent("Exports")) }
+}
+
+@Test func longUnicodeMovieNamesFitFilesystemAndCanceledExportsLeaveNoBatch() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let disk = try ScriptLibrary(root: root)
+    let take = try disk.beginTake(scriptTitle: String(repeating: "👩🏽‍💻", count: 80))
+    #expect(take.exportFileName.utf8.count <= 255)
+    try Data([9]).write(to: disk.movieURL(for: take))
+    let store = TakeExportStore(), exports = root.appendingPathComponent("Exports")
+    let task = Task { try await store.prepare(takes: [take], libraryRoot: root, exportRoot: exports) }
+    task.cancel()
+    await #expect(throws: CancellationError.self) { try await task.value }
+    let remaining = (try? FileManager.default.contentsOfDirectory(atPath: exports.path)) ?? []
+    #expect(remaining.isEmpty)
+}
