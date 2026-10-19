@@ -17,7 +17,7 @@ struct RecordingView: View {
             let width = geometry.size.width * model.settings.widthFraction
             let layout = layoutCache.layout(text: model.isTalkingPoints ? "" : model.script.text, width: width - 32, fontSize: model.settings.fontSize)
             ZStack {
-                LensTheme.ink.ignoresSafeArea()
+                LensTheme.background.ignoresSafeArea()
                 if model.camera.previewAvailable { CameraPreview(session: model.camera.session).ignoresSafeArea() }
                 else {
                     VStack(spacing: 12) {
@@ -33,7 +33,7 @@ struct RecordingView: View {
                         Text(model.practice ? "תרגול בלבד" : phaseLabel).font(.caption.weight(.medium))
                         Spacer()
                         HStack(spacing: 5) {
-                            Circle().fill(model.practice ? LensTheme.lime : Color.red).frame(width: 7, height: 7)
+                            Circle().fill(model.practice ? LensTheme.accent : LensTheme.recording).frame(width: 7, height: 7)
                             Text(LensTheme.time(model.playback.clock.elapsed)).monospacedDigit().accessibilityIdentifier("take-timer")
                         }.font(.caption).padding(9).background(.black.opacity(0.35), in: Capsule()).environment(\.layoutDirection, .leftToRight)
                     }.padding(.horizontal, 20)
@@ -66,7 +66,7 @@ struct RecordingView: View {
                     }
                 }
                 if model.finished { result }
-            }.foregroundStyle(.white)
+            }.foregroundStyle(LensTheme.text)
                 .task { model.begin(travel: layout.lastLineY) }
         }
         .interactiveDismissDisabled()
@@ -92,8 +92,13 @@ struct RecordingView: View {
     private func talkingPointCard(width: CGFloat, height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             if let point = model.currentPoint {
+                HStack(spacing: 6) {
+                    ForEach(model.talkingPoints.indices, id: \.self) { index in
+                        Capsule().fill(index == model.pointIndex ? LensTheme.accent : LensTheme.divider).frame(height: 5)
+                    }
+                }.accessibilityHidden(true)
                 HStack {
-                    Text(point.stage.title).font(.subheadline.weight(.semibold)).foregroundStyle(LensTheme.lime)
+                    Text(point.stage.title).font(.subheadline.weight(.semibold)).foregroundStyle(LensTheme.accent)
                         .accessibilityIdentifier("point-stage")
                     Spacer()
                     Text("\(model.pointIndex + 1) מתוך \(model.talkingPoints.count)").font(.caption).foregroundStyle(.white.opacity(0.7))
@@ -107,7 +112,7 @@ struct RecordingView: View {
                     .font(.caption).foregroundStyle(.white.opacity(0.7))
             }
         }.padding(20).frame(width: width, height: height, alignment: .topLeading)
-            .background(.black.opacity(model.settings.backgroundOpacity), in: RoundedRectangle(cornerRadius: 20))
+            .background(LensTheme.background.opacity(model.settings.backgroundOpacity), in: RoundedRectangle(cornerRadius: 16))
     }
     private var controls: some View {
         VStack(spacing: 16) {
@@ -119,45 +124,48 @@ struct RecordingView: View {
                 Text("\(Int(effective)) מילים/דקה")
             }.font(.caption)
             Slider(value: Binding(get: { min(220, max(50, model.settings.pace == .duration ? Double(model.script.wordCount) / model.settings.duration(wordCount: model.script.wordCount) * 60 : model.settings.wordsPerMinute)) }, set: { model.changeSpeed($0) }), in: 50...220, step: 5)
-                .tint(LensTheme.lime).environment(\.layoutDirection, .leftToRight).accessibilityLabel("מהירות בזמן צילום")
+                .tint(LensTheme.accent).environment(\.layoutDirection, .leftToRight).accessibilityLabel("מהירות בזמן צילום")
             }
-            HStack {
+            HStack(alignment: .center, spacing: 12) {
                 if model.isTalkingPoints {
-                    control("arrow.right", title: "הקודם", id: "previous-point") { model.movePoint(by: -1) }
+                    control("chevron.right", title: "הקודם", id: "previous-point") { model.movePoint(by: -1) }
                         .disabled(model.pointIndex == 0).opacity(model.pointIndex == 0 ? 0.35 : 1)
-                } else {
-                    control("arrow.counterclockwise", title: "להתחלה", id: "reset-text") { model.playback.resetText() }
-                }
-                Spacer()
-                Button { model.stop() } label: {
-                    RoundedRectangle(cornerRadius: 5).fill(Color(red: 0.8, green: 0.32, blue: 0.26)).frame(width: 24, height: 24)
-                        .frame(width: 66, height: 66).background(.white, in: Circle()).overlay(Circle().stroke(.white.opacity(0.3), lineWidth: 5).padding(-4))
-                }.accessibilityLabel("סיום הטייק").accessibilityIdentifier("finish-take")
-                Spacer()
-                if model.isTalkingPoints {
-                    control("arrow.left", title: "הבא", id: "next-point", prominent: true) { model.movePoint(by: 1) }
+                    control("chevron.left", title: "הבא", id: "next-point", prominent: true) { model.movePoint(by: 1) }
                         .disabled(model.pointIndex >= model.talkingPoints.count - 1)
                         .opacity(model.pointIndex >= model.talkingPoints.count - 1 ? 0.35 : 1)
                 } else {
-                    control(model.playback.clock.isPaused ? "play.fill" : "pause.fill", title: model.playback.clock.isPaused ? "המשך גלילה" : "השהיית מלל", id: "pause-text") { model.playback.pauseText() }
+                    control("arrow.counterclockwise", title: "להתחלה", id: "reset-text") { model.playback.resetText() }
+                    control(model.playback.clock.isPaused ? "play.fill" : "pause.fill", title: model.playback.clock.isPaused ? "המשך גלילה" : "השהיית מלל", id: "pause-text", prominent: true) { model.playback.pauseText() }
                 }
+                Spacer(minLength: 4)
+                Button { model.stop() } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "stop.fill").font(.system(size: 23))
+                            .foregroundStyle(LensTheme.background).frame(width: 62, height: 62)
+                            .background(LensTheme.recording, in: Circle())
+                        Text("סיום הטייק").font(.caption).foregroundStyle(LensTheme.recording)
+                    }.frame(minWidth: 70, minHeight: 88)
+                }.accessibilityLabel("סיום הטייק").accessibilityIdentifier("finish-take")
             }.disabled(model.lifecycle.phase == .starting || model.lifecycle.phase == .finishing)
-        }.padding(20).background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 25)).padding(.horizontal, 20)
+        }.padding(18).background(LensTheme.background.opacity(0.96), in: RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(LensTheme.divider))
+            .padding(.horizontal, 16)
     }
     private func control(_ symbol: String, title: String, id: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                Image(systemName: symbol).frame(width: prominent ? 58 : 43, height: prominent ? 58 : 43)
-                    .foregroundStyle(prominent ? LensTheme.ink : .white)
-                    .background(prominent ? LensTheme.lime : .white.opacity(0.1), in: Circle())
-                Text(title).font(.caption2)
-            }.frame(width: 80)
+                Image(systemName: symbol).font(.system(size: 23, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .foregroundStyle(prominent ? LensTheme.background : LensTheme.text)
+                    .background(prominent ? LensTheme.accent : LensTheme.surface, in: RoundedRectangle(cornerRadius: 14))
+                Text(title).font(.caption).lineLimit(2).multilineTextAlignment(.center)
+            }.frame(maxWidth: prominent ? 110 : 84, minHeight: 88)
         }.accessibilityLabel(title).accessibilityIdentifier(id)
     }
     private var result: some View {
         VStack(spacing: 18) {
             Spacer()
-            Image(systemName: model.error == nil ? "checkmark.circle" : "exclamationmark.triangle").font(.system(size: 43, weight: .light)).foregroundStyle(LensTheme.green)
+            Image(systemName: model.error == nil ? "checkmark.circle" : "exclamationmark.triangle").font(.system(size: 43, weight: .light)).foregroundStyle(LensTheme.accent)
             Text(model.practice ? "התרגול הסתיים" : "הטייק הסתיים").font(.title.bold())
             Text("משך \(LensTheme.time(model.playback.clock.elapsed))").font(.subheadline).foregroundStyle(.secondary)
             if let message = model.message { Text(message).font(.subheadline).multilineTextAlignment(.center) }
@@ -172,6 +180,6 @@ struct RecordingView: View {
                 model.begin(travel: layoutCache.layout(text: model.isTalkingPoints ? "" : script.text, width: width, fontSize: model.settings.fontSize).lastLineY)
             }.buttonStyle(MainButtonStyle())
             Button("חזרה להכנה") { dismiss() }.buttonStyle(MainButtonStyle(secondary: true)).accessibilityIdentifier("back-setup")
-        }.padding(24).foregroundStyle(LensTheme.ink).frame(maxWidth: .infinity, maxHeight: .infinity).background(LensTheme.paper).ignoresSafeArea(edges: .bottom)
+        }.padding(24).foregroundStyle(LensTheme.text).frame(maxWidth: .infinity, maxHeight: .infinity).background(LensTheme.background).ignoresSafeArea(edges: .bottom)
     }
 }

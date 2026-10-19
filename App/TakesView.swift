@@ -23,13 +23,13 @@ struct TakesView: View {
                         VStack(alignment: .leading, spacing: 7) {
                             Text(take.scriptTitle.isEmpty ? "טייק ללא כותרת" : take.scriptTitle).font(.headline)
                             Text(take.createdAt, format: .dateTime.day().month().hour().minute()).font(.caption).foregroundStyle(.secondary)
-                            Text("\(statusLabel(take.status)) · \(LensTheme.time(take.duration))").font(.caption).foregroundStyle(LensTheme.green)
+                            Text("\(statusLabel(take.status)) · \(LensTheme.time(take.duration))").font(.caption).foregroundStyle(LensTheme.accent)
                         }.padding(.vertical, 6)
-                    }.swipeActions { Button("מחיקה", role: .destructive) { deleting = take } }
+                    }.listRowBackground(LensTheme.surface).swipeActions { Button("מחיקה", role: .destructive) { deleting = take } }
                 }
                 Text("הטייקים נשמרים בתוך האפליקציה. כדי לשמור עותק נוסף, ייצא לתמונות או שתף למקבוק. מחיקת האפליקציה עלולה למחוק את הקבצים המקומיים.")
                     .font(.footnote).foregroundStyle(.secondary)
-            }.scrollContentBackground(.hidden).background(LensTheme.paper)
+            }.scrollContentBackground(.hidden).background(LensTheme.background).foregroundStyle(LensTheme.text)
                 .navigationTitle("הטייקים שלי").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("סיום") { dismiss() } } }
                 .task { await recoverPending() }
                 .confirmationDialog("למחוק את הטייק והסרטון?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
@@ -41,7 +41,7 @@ struct TakesView: View {
                     }
                     Button("ביטול", role: .cancel) { deleting = nil }
                 }
-        }.environment(\.layoutDirection, .rightToLeft).tint(LensTheme.green).lensError($recoveryMessage)
+        }.environment(\.layoutDirection, .rightToLeft).tint(LensTheme.accent).lensError($recoveryMessage)
     }
 
     private func statusLabel(_ status: TakeStatus) -> String {
@@ -102,7 +102,7 @@ struct TakeDetailView: View {
                 } else { Text("קובץ הסרטון אינו זמין. לא נמחקו קבצים נוספים.").font(.footnote).foregroundStyle(.secondary) }
                 if !embedded { Text("הקובץ המקורי נשאר באפליקציה גם אחרי שיתוף או שמירה לתמונות.").font(.footnote).foregroundStyle(.secondary) }
             }.padding(embedded ? 4 : 24)
-        }.background(LensTheme.paper).navigationTitle(embedded ? "" : take.scriptTitle).navigationBarTitleDisplayMode(.inline)
+        }.background(LensTheme.background).foregroundStyle(LensTheme.text).navigationTitle(embedded ? "" : take.scriptTitle).navigationBarTitleDisplayMode(.inline)
             .task { if valid && fileExists { player = AVPlayer(url: url) } }
             .onDisappear { player?.pause(); player = nil }
             .lensError($error)

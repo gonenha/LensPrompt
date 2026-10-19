@@ -4,6 +4,7 @@ import PrompterCore
 struct SetupView: View {
     let library: LibraryModel
     @Binding var script: Script
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var camera = CameraModel()
     @State private var presenting = false
     @State private var practice = true
@@ -16,15 +17,16 @@ struct SetupView: View {
                 ZStack {
                     CameraPreview(session: camera.session)
                     if !camera.previewAvailable {
-                        LensTheme.pale
-                        Image(systemName: "person.crop.rectangle").font(.system(size: 50, weight: .ultraLight)).foregroundStyle(LensTheme.green.opacity(0.35))
+                        LensTheme.surface
+                        Image(systemName: "person.crop.rectangle").font(.system(size: 50, weight: .ultraLight)).foregroundStyle(LensTheme.accent.opacity(0.35))
                     }
                     Text(String((script.presentationMode == .talkingPoints ? script.activeTalkingPoints.first?.text ?? "" : script.text).prefix(90))).font(.system(size: min(22, script.settings.fontSize * 0.6), weight: .semibold))
-                        .lineLimit(2).padding(12).frame(maxWidth: .infinity).background(LensTheme.paper.opacity(0.85), in: RoundedRectangle(cornerRadius: 10)).padding(18)
+                        .lineLimit(2).padding(12).frame(maxWidth: .infinity).background(LensTheme.background.opacity(0.9), in: RoundedRectangle(cornerRadius: 10)).padding(18)
                 }.frame(height: 140).clipShape(RoundedRectangle(cornerRadius: 19))
                 if let notice = camera.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
                 settingLabel("איך מצלמים?")
-                HStack {
+                let choiceLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 4))
+                choiceLayout {
                     modeButton("ביד", mode: .hand, id: "hand-mode")
                     modeButton("ממרחק מטר", mode: .distance, id: "distance-mode")
                 }
@@ -43,10 +45,10 @@ struct SetupView: View {
                             .accessibilityLabel("רגישות לקול")
                     }.font(.subheadline)
                 }
-                Picker("קצב הגלילה", selection: $script.settings.pace) {
-                    Text("מילים בדקה").tag(Pace.words)
-                    Text("משך יעד").tag(Pace.duration)
-                }.pickerStyle(.segmented)
+                choiceLayout {
+                    StudioChoice(title: "מילים בדקה", selected: script.settings.pace == .words) { script.settings.pace = .words }
+                    StudioChoice(title: "משך יעד", selected: script.settings.pace == .duration) { script.settings.pace = .duration }
+                }.padding(4).background(LensTheme.surface, in: RoundedRectangle(cornerRadius: 16))
                 if script.settings.pace == .words {
                     settingLabel("מהירות", value: "\(Int(script.settings.wordsPerMinute)) מילים בדקה")
                     Slider(value: $script.settings.wordsPerMinute, in: 50...220, step: 5).accessibilityLabel("מהירות הגלילה")
@@ -102,7 +104,7 @@ struct SetupView: View {
                     Button("פתיחת הגדרות הרשאות") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }.font(.footnote)
                 }
             }.padding(24)
-        }.background(LensTheme.paper).navigationTitle("לפני הטייק").navigationBarTitleDisplayMode(.inline)
+        }.background(LensTheme.background).foregroundStyle(LensTheme.text).tint(LensTheme.accent).navigationTitle("לפני הטייק").navigationBarTitleDisplayMode(.inline)
             .task { await camera.preparePreviewIfAuthorized() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active && !presenting { Task { await camera.preparePreviewIfAuthorized() } }
@@ -124,10 +126,7 @@ struct SetupView: View {
         HStack { Text(title).font(.subheadline.weight(.semibold)); Spacer(); if let value { Text(value).font(.caption).foregroundStyle(.secondary) } }
     }
     private func modeButton(_ title: String, mode: FilmingMode, id: String) -> some View {
-        Button { script.settings.apply(mode) } label: {
-            Text(title).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(12)
-                .background(script.settings.mode == mode ? Color.white : LensTheme.pale, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(LensTheme.green.opacity(script.settings.mode == mode ? 0.3 : 0.05)))
-        }.buttonStyle(.plain).accessibilityIdentifier(id)
+        StudioChoice(title: title, selected: script.settings.mode == mode) { script.settings.apply(mode) }
+            .accessibilityIdentifier(id)
     }
 }

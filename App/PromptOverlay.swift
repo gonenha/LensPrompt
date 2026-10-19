@@ -36,10 +36,10 @@ private struct PromptLabel: UIViewRepresentable {
         view.textStorage.beginEditing()
         if let old = coordinator.highlighted, layout.wordRanges.indices.contains(old) {
             view.textStorage.removeAttribute(.backgroundColor, range: layout.wordRanges[old])
-            view.textStorage.addAttribute(.foregroundColor, value: UIColor.white, range: layout.wordRanges[old])
+            view.textStorage.addAttribute(.foregroundColor, value: UIColor(LensTheme.text), range: layout.wordRanges[old])
         }
         if let index = currentWord, layout.wordRanges.indices.contains(index) {
-            view.textStorage.addAttributes([.backgroundColor: UIColor(LensTheme.lime), .foregroundColor: UIColor.black], range: layout.wordRanges[index])
+            view.textStorage.addAttributes([.foregroundColor: UIColor(LensTheme.accent)], range: layout.wordRanges[index])
         }
         view.textStorage.endEditing()
         coordinator.highlighted = currentWord
@@ -55,14 +55,14 @@ struct PromptOverlay: View {
     var onSelect: ((Int) -> Void)? = nil
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.opacity(opacity)
-            Rectangle().fill(LensTheme.lime.opacity(0.12)).frame(height: layout.lineHeight)
-                .overlay(alignment: .trailing) { Rectangle().fill(LensTheme.lime).frame(width: 3) }.offset(y: 32)
+            LensTheme.background.opacity(opacity)
+            Rectangle().fill(LensTheme.accent.opacity(0.12)).frame(height: layout.lineHeight)
+                .overlay(alignment: .trailing) { Rectangle().fill(LensTheme.accent).frame(width: 3) }.offset(y: 32)
             PromptLabel(layout: layout, currentWord: currentWord, onSelect: onSelect).frame(width: max(1, width - 32), height: layout.height)
                 .offset(y: 32 - offset)
                 .animation(currentWord == nil ? nil : .easeOut(duration: 0.18), value: offset)
         }.frame(width: width, height: max(190, layout.lineHeight * 3.4), alignment: .top)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             .mask { LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.07), .init(color: .black, location: 0.82), .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom) }
             .accessibilityIdentifier("prompt-overlay")
     }

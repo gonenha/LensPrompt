@@ -21,7 +21,7 @@ struct LensPromptApp: App {
                 else { ContentUnavailableView("לא ניתן לפתוח אחסון מקומי", systemImage: "externaldrive.badge.exclamationmark", description: Text(startupError ?? "יש לנסות לפתוח את האפליקציה מחדש.")) }
             }.environment(\.layoutDirection, .rightToLeft)
                 .environment(\.locale, Locale(identifier: "he_IL"))
-                .preferredColorScheme(.light)
+                .preferredColorScheme(.dark)
                 .task(id: scenePhase) {
                     guard scenePhase == .active, let library else { return }
                     while !Task.isCancelled {
