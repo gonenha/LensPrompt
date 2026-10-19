@@ -166,6 +166,43 @@ final class FlowTests: XCTestCase {
     }
 
     @MainActor
+    func testRecordingPauseFreezesRehearsalTimerAndCanFinishPaused() {
+        let app = XCUIApplication(); app.launch()
+        app.buttons["new-script"].tap(); app.buttons["נקודות לדיבור"].tap()
+        let field = app.descendants(matching: .any).matching(identifier: "point-opening").firstMatch
+        field.tap(); app.typeText("Pause this take"); app.buttons["dismiss-keyboard"].tap()
+        app.buttons["prepare"].tap(); app.swipeUp(); app.buttons["rehearse"].tap()
+        let timer = app.staticTexts["take-timer"]
+        XCTAssertTrue(timer.waitForExistence(timeout: 3))
+        app.buttons["pause-recording"].tap()
+        let pausedTime = timer.label
+        let stayedPaused = expectation(for: NSPredicate { _, _ in timer.label != pausedTime }, evaluatedWith: timer)
+        stayedPaused.isInverted = true; wait(for: [stayedPaused], timeout: 1.3)
+        app.buttons["pause-recording"].tap()
+        let resumes = expectation(for: NSPredicate { _, _ in timer.label != pausedTime }, evaluatedWith: timer)
+        wait(for: [resumes], timeout: 3)
+        app.buttons["pause-recording"].tap(); app.buttons["finish-take"].tap()
+        XCTAssertTrue(app.staticTexts["התרגול הסתיים"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testSavedMovieCanPlayAndDeleteWithConfirmation() {
+        let app = XCUIApplication(); app.launch(); app.buttons["takes"].tap()
+        let fixture = app.staticTexts["בדיקת סרטון — סימולטור"]
+        XCTAssertTrue(fixture.waitForExistence(timeout: 3))
+        fixture.tap()
+        XCTAssertTrue(app.buttons["play-take"].waitForExistence(timeout: 5))
+        app.buttons["play-take"].tap()
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "take-review-player"; shot.lifetime = .keepAlways; add(shot)
+        app.swipeUp(); app.buttons["delete-take"].tap(); app.buttons["ביטול"].tap()
+        XCTAssertTrue(app.buttons["delete-take"].exists)
+        app.buttons["delete-take"].tap(); app.buttons["מחיקת טייק"].tap()
+        XCTAssertTrue(app.navigationBars["הטייקים שלי"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["בדיקת סרטון — סימולטור"].exists)
+        app.buttons["סיום"].tap(); XCTAssertTrue(app.buttons["new-script"].exists)
+    }
+
+    @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, upwards: Bool) {
         for _ in 0..<10 {
             var bottom = app.frame.maxY - 90

@@ -12,6 +12,8 @@ final class CameraModel {
     var notice: String? = "המצלמה תיפתח לאחר אישור גישה. אפשר לתרגל גם בלי מצלמה."
     var error: String?
     @ObservationIgnored var onStarted: (() -> Void)?
+    @ObservationIgnored var onPaused: (() -> Void)?
+    @ObservationIgnored var onResumed: (() -> Void)?
     @ObservationIgnored var onFinished: ((URL, String?, Bool) -> Void)?
     @ObservationIgnored private var eventTask: Task<Void, Never>?
 
@@ -22,6 +24,8 @@ final class CameraModel {
                 guard let self else { return }
                 switch event {
                 case .started: self.onStarted?()
+                case .paused: self.onPaused?()
+                case .resumed: self.onResumed?()
                 case .finished(let url, let message, let usable): self.onFinished?(url, message, usable)
                 }
             }
@@ -70,6 +74,8 @@ final class CameraModel {
         }
     }
     func startMovie(at url: URL) async throws { try await hardware.startMovie(at: url) }
+    func pauseMovie() async throws { try await hardware.pauseMovie() }
+    func resumeMovie() async throws { try await hardware.resumeMovie() }
     func stopMovie() async { await hardware.stopMovie() }
     func suspendPreview() async { await hardware.suspend(); previewAvailable = false }
 }

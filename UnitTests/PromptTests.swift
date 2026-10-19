@@ -1,3 +1,4 @@
+@preconcurrency import AVFoundation
 import Testing
 import PrompterCore
 import SwiftUI
@@ -199,4 +200,127 @@ import SwiftUI
     library.receiveCodexInbox()
     #expect(library.scripts.contains(where: { $0.id == incoming }))
     #expect(library.scripts.contains(where: { $0.id == unsaved.id }))
+}
+
+@Test @MainActor func capturePauseFreezesTimerAndPreservesIndependentTextPause() {
+    let playback = PlaybackModel()
+    playback.start(travel: 100, duration: 10)
+    defer { playback.stop() }
+    playback.advance(by: 2, at: 2)
+    playback.pauseText()
+    playback.setCapturePaused(true)
+    let elapsed = playback.clock.elapsed
+    playback.advance(by: 20, at: 22)
+    #expect(playback.clock.elapsed == elapsed)
+    #expect(playback.clock.offset == 20)
+    playback.setCapturePaused(false)
+    playback.advance(by: 1, at: 23)
+    #expect(playback.clock.isPaused)
+    #expect(playback.clock.elapsed == elapsed + 1)
+    #expect(playback.clock.offset == 20)
+    playback.pauseText(); playback.advance(by: 1, at: 24)
+    #expect(playback.clock.offset == 30)
+}
+
+@Test @MainActor func pausedPracticeCanFinishAndCannotMoveTalkingPoint() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = LibraryModel(disk: try ScriptLibrary(root: root))
+    var script = Script(title: "Pause")
+    script.presentationMode = .talkingPoints
+    script.setPointText("first", for: .opening); script.setPointText("next", for: .offer)
+    let model = RecordingModel(library: library, camera: CameraModel(), script: script, practice: true)
+    defer { model.leave() }
+    model.begin(travel: 100)
+    try await Task.sleep(for: .milliseconds(100))
+    model.toggleRecordingPause()
+    #expect(model.lifecycle.phase == .paused)
+    let elapsed = model.playback.clock.elapsed
+    model.playback.advance(by: 10, at: 10); model.movePoint(by: 1)
+    #expect(model.pointIndex == 0); #expect(model.playback.clock.elapsed == elapsed)
+    model.toggleRecordingPause(); #expect(model.lifecycle.phase == .recording)
+    model.movePoint(by: 1); #expect(model.pointIndex == 1)
+    model.toggleRecordingPause(); model.stop()
+    #expect(model.finished); #expect(model.lifecycle.phase == .finished)
+}
+
+@Test @MainActor func deletingSelectedTakeReloadsLibraryAndReportsMissingTake() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = LibraryModel(disk: try ScriptLibrary(root: root))
+    let first = try library.disk.beginTake(scriptTitle: "delete")
+    let other = try library.disk.beginTake(scriptTitle: "keep")
+    try Data([1]).write(to: library.disk.movieURL(for: first))
+    try Data([2]).write(to: library.disk.movieURL(for: other))
+    library.reloadTakes()
+    #expect(library.deleteTake(first))
+    #expect(library.takes.map(\.id) == [other.id])
+    #expect(!library.deleteTake(first))
+    #expect(library.error != nil)
+    #expect(try Data(contentsOf: library.disk.movieURL(for: other)) == Data([2]))
+}
+
+
+@MainActor private func makeReviewFixture(at url: URL) async throws {
+    let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+    let input = AVAssetWriterInput(mediaType: .video, outputSettings: [AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 64, AVVideoHeightKey: 64])
+    let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB, kCVPixelBufferWidthKey as String: 64, kCVPixelBufferHeightKey as String: 64])
+    writer.add(input)
+    guard writer.startWriting() else { throw writer.error ?? MovieError.invalid }
+    writer.startSession(atSourceTime: .zero)
+    var buffer: CVPixelBuffer?
+    guard CVPixelBufferCreate(kCFAllocatorDefault, 64, 64, kCVPixelFormatType_32ARGB, nil, &buffer) == kCVReturnSuccess, let buffer else { throw MovieError.invalid }
+    CVPixelBufferLockBaseAddress(buffer, [])
+    if let bytes = CVPixelBufferGetBaseAddress(buffer) { memset(bytes, 100, CVPixelBufferGetDataSize(buffer)) }
+    CVPixelBufferUnlockBaseAddress(buffer, [])
+    for frame in 0..<30 {
+        var waits = 0
+        while !input.isReadyForMoreMediaData {
+            guard writer.status == .writing, waits < 500 else { throw writer.error ?? MovieError.invalid }
+            waits += 1; try await Task.sleep(for: .milliseconds(10))
+        }
+        guard adaptor.append(buffer, withPresentationTime: CMTime(value: Int64(frame), timescale: 30)) else { throw writer.error ?? MovieError.invalid }
+    }
+    input.markAsFinished(); await writer.finishWriting()
+    guard writer.status == .completed else { throw writer.error ?? MovieError.invalid }
+}
+
+@Test @MainActor func finalizedMovieIsReadyForImmediateReview() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = LibraryModel(disk: try ScriptLibrary(root: root))
+    let take = try library.disk.beginTake(scriptTitle: "review")
+    let url = library.disk.movieURL(for: take)
+    try await makeReviewFixture(at: url)
+    let model = RecordingModel(library: library, camera: CameraModel(), script: .sample, practice: false)
+    model.take = take
+    #expect(model.reviewableTake == nil)
+    await model.captureFinished(url: url, captureError: nil, usable: true)
+    #expect(model.finished); #expect(model.reviewableTake?.status == .ready)
+    #expect((model.reviewableTake?.duration ?? 0) > 0)
+    #expect(library.takes.first?.id == take.id)
+    #expect(!model.camera.previewAvailable)
+    // Seed generated, silent test media ONLY into the simulator app for the UI review test.
+    #if targetEnvironment(simulator)
+    let simulatorStore = try ScriptLibrary(root: URL.documentsDirectory.appendingPathComponent("LensPrompt"))
+    for existing in try simulatorStore.loadTakes() where existing.scriptTitle == "בדיקת סרטון — סימולטור" { try simulatorStore.deleteTake(id: existing.id) }
+    let fixture = try simulatorStore.beginTake(scriptTitle: "בדיקת סרטון — סימולטור")
+    try FileManager.default.copyItem(at: url, to: simulatorStore.movieURL(for: fixture))
+    try simulatorStore.finishTake(id: fixture.id, duration: model.reviewableTake?.duration ?? 1, interrupted: false)
+    #endif
+}
+
+@Test @MainActor func canceledOrDismissedRetakePreparationCannotStart() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = LibraryModel(disk: try ScriptLibrary(root: root))
+    let model = RecordingModel(library: library, camera: CameraModel(), script: .sample, practice: true)
+    model.finished = true
+    let canceled = Task { @MainActor in await model.prepareRetake() }
+    canceled.cancel()
+    #expect(await canceled.value == false)
+    model.leave()
+    let afterDismiss = await model.prepareRetake()
+    #expect(!afterDismiss)
+    #expect(!model.playback.isRunning)
 }

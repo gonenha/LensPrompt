@@ -11,6 +11,7 @@ import PrompterCore
 final class PlaybackModel {
     var clock = ScrollClock(travel: 1, duration: 1)
     var isRunning = false
+    private(set) var capturePaused = false
     var followsVoice = false
     var soundActive = false
     private var cue = WordCue(text: "")
@@ -22,7 +23,7 @@ final class PlaybackModel {
     @ObservationIgnored private var lastTimestamp: CFTimeInterval?
 
     func start(travel: Double, duration: Double, text: String = "", followsVoice: Bool = false, threshold: Double = -40) {
-        stop(); clock = ScrollClock(travel: travel, duration: duration)
+        stop(); capturePaused = false; clock = ScrollClock(travel: travel, duration: duration)
         self.followsVoice = followsVoice; cue = WordCue(text: text)
         gate = SoundGate(threshold: threshold); soundActive = false
         isRunning = true; target.owner = self
@@ -37,6 +38,7 @@ final class PlaybackModel {
     }
     func receiveAudio(level: Double, at time: Double) { gate.receive(level: level, at: time) }
     func advance(by delta: Double, at time: Double) {
+        guard !capturePaused else { return }
         soundActive = followsVoice && gate.isOpen(at: time)
         clock.advance(by: delta, moveText: !followsVoice || soundActive)
     }
@@ -44,6 +46,7 @@ final class PlaybackModel {
         guard followsVoice, cue.ranges.indices.contains(index) else { return }
         clock.seek(to: cue.position(for: index))
     }
+    func setCapturePaused(_ paused: Bool) { capturePaused = paused; if paused { soundActive = false } }
     func pauseText() { clock.isPaused.toggle() }
     func resetText() { clock.resetText() }
     func setDuration(_ duration: Double) { clock.setDuration(duration) }

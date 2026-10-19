@@ -4,7 +4,7 @@ import os
 import QuartzCore
 
 enum CaptureEvent: Sendable {
-    case started
+    case started, paused, resumed
     case finished(URL, error: String?, usable: Bool)
 }
 
@@ -13,6 +13,14 @@ private final class MovieDelegate: NSObject, AVCaptureFileOutputRecordingDelegat
     init(_ continuation: AsyncStream<CaptureEvent>.Continuation) { self.continuation = continuation }
     func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
         continuation.yield(.started)
+    }
+    @available(iOS 18.0, *)
+    func fileOutput(_ output: AVCaptureFileOutput, didPauseRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+        continuation.yield(.paused)
+    }
+    @available(iOS 18.0, *)
+    func fileOutput(_ output: AVCaptureFileOutput, didResumeRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+        continuation.yield(.resumed)
     }
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo url: URL, from connections: [AVCaptureConnection], error: (any Error)?) {
         let nsError = error as NSError?
@@ -84,8 +92,15 @@ actor CameraHardware {
         if !session.isRunning { session.startRunning() }
     }
 
+    private var hasOpenMovie: Bool {
+        if #available(iOS 18.0, *) { return output.isRecording || output.isRecordingPaused }
+        return output.isRecording
+    }
+
     func prepareMicrophone() throws {
         try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        // Advisory protection only: banners/Focus remain controlled by the user.
+        try? AVAudioSession.sharedInstance().setPrefersNoInterruptionsFromSystemAlerts(true)
         try AVAudioSession.sharedInstance().setActive(true)
         guard !microphoneConfigured else { return }
         guard let device = AVCaptureDevice.default(for: .audio) else { throw CameraFailure.microphone }
@@ -119,23 +134,31 @@ actor CameraHardware {
         if meterConfigured {
             session.removeOutput(meter); meter.setSampleBufferDelegate(nil, queue: nil); meterConfigured = false
         }
-        if !output.isRecording, let microphoneInput {
+        if !hasOpenMovie, let microphoneInput {
             session.removeInput(microphoneInput); self.microphoneInput = nil; microphoneConfigured = false
         }
         session.commitConfiguration()
-        if !output.isRecording {
+        if !hasOpenMovie {
             if !videoConfigured, session.isRunning { session.stopRunning() }
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
 
     func startMovie(at url: URL) throws {
-        guard session.isRunning, videoConfigured, microphoneConfigured, !output.isRecording else { throw CameraFailure.unavailable }
+        guard session.isRunning, videoConfigured, microphoneConfigured, !hasOpenMovie else { throw CameraFailure.unavailable }
         output.startRecording(to: url, recordingDelegate: delegate)
     }
-    func stopMovie() { if output.isRecording { output.stopRecording() } }
+    func pauseMovie() throws {
+        guard #available(iOS 18.0, *), hasOpenMovie, !output.isRecordingPaused else { throw CameraFailure.unavailable }
+        output.pauseRecording()
+    }
+    func resumeMovie() throws {
+        guard #available(iOS 18.0, *), output.isRecordingPaused else { throw CameraFailure.unavailable }
+        output.resumeRecording()
+    }
+    func stopMovie() { if hasOpenMovie { output.stopRecording() } }
     func suspend() {
-        guard !output.isRecording else { output.stopRecording(); return }
+        guard !hasOpenMovie else { output.stopRecording(); return }
         if session.isRunning { session.stopRunning() }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }

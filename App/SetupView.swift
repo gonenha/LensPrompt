@@ -24,6 +24,17 @@ struct SetupView: View {
                         .lineLimit(2).padding(12).frame(maxWidth: .infinity).background(LensTheme.background.opacity(0.9), in: RoundedRectangle(cornerRadius: 10)).padding(18)
                 }.frame(height: 140).clipShape(RoundedRectangle(cornerRadius: 19))
                 if let notice = camera.notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
+                DisclosureGroup("צילום ללא הפרעות") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("האפליקציה מבקשת לצמצם הפרעות לקול. להשתקת באנרים, הודעות ושיחות צריך להגדיר באייפון מצב ריכוז פעם אחת.")
+                        Text("1. הגדרות ← ריכוז ← + ← מותאם אישית. שם המצב: צילום.")
+                        Text("2. אנשים: אפשר התראות מאנשים מורשים בלבד, בלי להוסיף אנשים. כבה שיחות חוזרות.")
+                        Text("3. יישומים: אפשר התראות מיישומים מורשים בלבד, בלי להוסיף יישומים. כבה התראות רגישות לזמן וסינון חכם שמאפשר פריצות.")
+                        Text("4. הוסף תזמון לפי יישום ובחר ״מול העדשה״. ודא שההשתקה חלה גם כשהמכשיר פתוח.")
+                        Text("5. בהגדרות הטלפון בחר הצגת שיחות נכנסות כבאנר. מענה לשיחה עדיין יקטע את הצילום; התראות חירום מורשות עשויות לעבור.")
+                        Text("מצב הריכוז מופעל דרך הגדרות iOS. האפליקציה אינה יכולה להפעיל אותו בעצמה.")
+                    }.font(.footnote).foregroundStyle(LensTheme.muted).fixedSize(horizontal: false, vertical: true).padding(.top, 8)
+                }.font(.subheadline).accessibilityIdentifier("focus-guide")
                 settingLabel("איך מצלמים?")
                 let choiceLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 4))
                 choiceLayout {
