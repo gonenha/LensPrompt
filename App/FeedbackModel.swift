@@ -38,14 +38,14 @@ import PrompterCore
         camera.onStarted = { [weak self] in self?.started() }
         camera.onFinished = { [weak self] url, message, usable in
             guard let self else { return }
-            Task { await self.finished(url: url, usable: usable && message == nil) }
+            Task { await self.finished(url: url, usable: usable, captureError: message) }
         }
     }
     func start(travel: Double) {
         guard phase == .intro, !left else { return }
         camera.onStarted = { [weak self] in self?.started() }
         // Keep the owner alive until its movie delegate finishes, including forced dismissal.
-        camera.onFinished = { [self] url, message, usable in Task { await finished(url: url, usable: usable && message == nil) } }
+        camera.onFinished = { [self] url, message, usable in Task { await finished(url: url, usable: usable, captureError: message) } }
         phase = .preparing; discarded = false; elapsed = 0; pointIndex = 0
         let id = UUID(); generation = id
         work = Task {
@@ -97,7 +97,7 @@ import PrompterCore
         Task { await camera.stopMovie() }
     }
 
-    private func finished(url: URL, usable: Bool) async {
+    private func finished(url: URL, usable: Bool, captureError: String?) async {
         guard url == rawURL else { return }
         camera.onFinished = nil; camera.onStarted = nil
         clock?.cancel(); playback.stop()
@@ -106,7 +106,7 @@ import PrompterCore
         endBackground()
         guard !discarded, !left, usable, let folder else {
             await cleanup()
-            if !left { phase = .intro; if !usable && !discarded { error = FeedbackFailure.media.localizedDescription } }
+            if !left { phase = .intro; if !usable && !discarded { error = "לא ניתן להתחיל או להשלים את הקלטת התרגול.\n" + (captureError ?? "המצלמה לא יצרה מקטע תקין.") } }
             return
         }
         phase = .processing

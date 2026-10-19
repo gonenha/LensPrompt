@@ -8,7 +8,7 @@ enum CaptureEvent: Sendable {
     case finished(URL, error: String?, usable: Bool)
 }
 
-private final class MovieDelegate: NSObject, AVCaptureFileOutputRecordingDelegate, Sendable {
+final class MovieDelegate: NSObject, AVCaptureFileOutputRecordingDelegate, Sendable {
     let continuation: AsyncStream<CaptureEvent>.Continuation
     init(_ continuation: AsyncStream<CaptureEvent>.Continuation) { self.continuation = continuation }
     func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
@@ -25,7 +25,8 @@ private final class MovieDelegate: NSObject, AVCaptureFileOutputRecordingDelegat
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo url: URL, from connections: [AVCaptureConnection], error: (any Error)?) {
         let nsError = error as NSError?
         let usable = error == nil || (nsError?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true)
-        continuation.yield(.finished(url, error: error?.localizedDescription, usable: usable))
+        let diagnostic = nsError.map { "\($0.localizedDescription) [\($0.domain) \($0.code)]" }
+        continuation.yield(.finished(url, error: diagnostic, usable: usable))
     }
 }
 

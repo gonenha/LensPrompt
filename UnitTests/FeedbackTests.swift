@@ -106,3 +106,21 @@ private final class NoVideoRequests: URLProtocol, @unchecked Sendable {
     #expect(model.error == FeedbackFailure.changed.localizedDescription)
     await model.close()
 }
+
+@Test func recordingFailurePreservesSystemDiagnosticAndSuccessFlag() async throws {
+    let stream = AsyncStream<CaptureEvent>.makeStream()
+    let delegate = MovieDelegate(stream.continuation)
+    let url = URL(fileURLWithPath: "/unused-practice.mov")
+    let failure = NSError(domain: AVFoundationErrorDomain, code: -11803,
+                          userInfo: [NSLocalizedDescriptionKey: "Cannot Record", AVErrorRecordingSuccessfullyFinishedKey: false])
+    delegate.fileOutput(AVCaptureMovieFileOutput(), didFinishRecordingTo: url, from: [], error: failure)
+    var events = stream.stream.makeAsyncIterator()
+    guard case let .finished(received, message, usable) = await events.next() else {
+        Issue.record("Missing recording completion"); return
+    }
+    #expect(received == url)
+    #expect(!usable)
+    #expect(message?.contains("-11803") == true)
+    #expect(message?.contains(AVFoundationErrorDomain) == true)
+    #expect(message?.contains("Cannot Record") == true)
+}
