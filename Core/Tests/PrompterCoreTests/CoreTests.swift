@@ -286,3 +286,51 @@ private func stageBridge(_ data: Data, id: UUID, store: ScriptLibrary, ready: Bo
     let empty = try JSONSerialization.data(withJSONObject: json)
     #expect(throws: (any Error).self) { try CodexTransfer.decode(empty, id: id, checksum: CodexTransfer.digest(empty)) }
 }
+
+@Test func capturePauseRequiresDelegateConfirmationAndCanFinishPaused() {
+    var life = CaptureLifecycle()
+    #expect({ !life.requestPause() }())
+    life.beginCountdown(); #expect({ life.requestStart() }()); #expect({ life.didStart() }())
+    #expect({ life.requestPause() }())
+    #expect(life.phase == .pausing)
+    #expect({ !life.requestPause() }()); #expect({ !life.requestResume() }())
+    #expect({ life.didPause() }()); #expect(life.phase == .paused)
+    #expect({ life.requestResume() }()); #expect(life.phase == .resuming)
+    #expect({ life.didResume() }()); #expect(life.phase == .recording)
+    #expect({ life.requestPause() }()); #expect({ life.didPause() }())
+    life.requestStop(); #expect(life.phase == .finishing)
+    #expect({ !life.didResume() }()); #expect({ !life.didPause() }())
+    life.didFinish(); #expect({ !life.requestResume() }())
+}
+
+@Test func stoppingPauseTransitionsIgnoresLateCallbacksAndRollsBackFailures() {
+    for resume in [false, true] {
+        var life = CaptureLifecycle()
+        life.beginCountdown(); _ = life.requestStart(); _ = life.didStart()
+        _ = life.requestPause()
+        if resume { _ = life.didPause(); _ = life.requestResume() }
+        life.requestStop(); #expect(life.phase == .finishing)
+        #expect({ !life.didPause() }()); #expect({ !life.didResume() }())
+    }
+    var life = CaptureLifecycle()
+    life.beginCountdown(); _ = life.requestStart(); _ = life.didStart()
+    _ = life.requestPause(); life.cancelPauseTransition(); #expect(life.phase == .recording)
+    _ = life.requestPause(); _ = life.didPause(); _ = life.requestResume()
+    life.cancelPauseTransition(); #expect(life.phase == .paused)
+}
+
+@Test func deletingOneTakePreservesScriptsAndOtherMovies() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = try ScriptLibrary(root: root)
+    try store.saveScripts([.sample])
+    let first = try store.beginTake(scriptTitle: "delete")
+    let other = try store.beginTake(scriptTitle: "keep")
+    try Data([1]).write(to: store.movieURL(for: first))
+    try Data([2]).write(to: store.movieURL(for: other))
+    try store.deleteTake(id: first.id)
+    #expect(!FileManager.default.fileExists(atPath: store.movieURL(for: first).path))
+    #expect(try Data(contentsOf: store.movieURL(for: other)) == Data([2]))
+    #expect(try store.loadTakes().map(\.id) == [other.id])
+    #expect(try store.loadScripts().count == 1)
+}

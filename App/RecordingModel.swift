@@ -23,6 +23,17 @@ final class RecordingModel {
         guard isTalkingPoints, lifecycle.phase == .recording, !talkingPoints.isEmpty else { return }
         pointIndex = min(talkingPoints.count - 1, max(0, pointIndex + delta))
     }
+    var canPause: Bool {
+        if practice { return true }
+        if #available(iOS 18.0, *) { return true }
+        return false
+    }
+    var pauseTransition: Bool { lifecycle.phase == .pausing || lifecycle.phase == .resuming }
+    var recordingPaused: Bool { lifecycle.phase == .paused || lifecycle.phase == .resuming }
+    var reviewableTake: Take? {
+        guard finished, !practice, let take, take.status == .ready || take.status == .interrupted else { return nil }
+        return take
+    }
     var take: Take?
     var finished = false
     var shouldDismiss = false
@@ -35,6 +46,7 @@ final class RecordingModel {
     @ObservationIgnored private let monitorOwner = UUID()
     @ObservationIgnored private var travel: Double = 1
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var hasLeft = false
     @ObservationIgnored private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
 
     init(library: LibraryModel, camera: CameraModel, script: Script, practice: Bool) {
@@ -43,10 +55,12 @@ final class RecordingModel {
     }
 
     func begin(travel: Double) {
-        guard !started else { return }
+        guard !started, !hasLeft else { return }
         started = true; self.travel = travel; library.inboxSuspended = true
         lifecycle.beginCountdown()
         camera.onStarted = { [weak self] in self?.captureStarted() }
+        camera.onPaused = { [weak self] in self?.capturePaused() }
+        camera.onResumed = { [weak self] in self?.captureResumed() }
         camera.onFinished = { [weak self] url, error, usable in
             Task { await self?.captureFinished(url: url, captureError: error, usable: usable) }
         }
@@ -102,12 +116,39 @@ final class RecordingModel {
         }
     }
 
+    func toggleRecordingPause() {
+        guard canPause else { return }
+        let resuming = lifecycle.phase == .paused
+        guard resuming ? lifecycle.requestResume() : lifecycle.requestPause() else { return }
+        if practice {
+            if resuming { captureResumed() } else { capturePaused() }
+            return
+        }
+        Task {
+            do {
+                if resuming { try await camera.resumeMovie() } else { try await camera.pauseMovie() }
+            } catch {
+                guard lifecycle.phase == (resuming ? .resuming : .pausing) else { return }
+                lifecycle.cancelPauseTransition()
+                self.error = "לא ניתן לשנות את מצב ההקלטה כרגע. אפשר לסיים את הטייק. " + error.localizedDescription
+            }
+        }
+    }
+    private func capturePaused() {
+        guard lifecycle.didPause() else { return }
+        playback.setCapturePaused(true)
+    }
+    private func captureResumed() {
+        guard lifecycle.didResume() else { return }
+        playback.setCapturePaused(false)
+    }
+
     func stop(interrupted: Bool = false) {
         self.interrupted = self.interrupted || interrupted
         switch lifecycle.phase {
         case .countdown, .idle:
             countdownTask?.cancel(); lifecycle.cancel(); endMonitoring(); restoreIdleTimer(); shouldDismiss = true
-        case .starting, .recording:
+        case .starting, .recording, .pausing, .paused, .resuming:
             lifecycle.requestStop(); playback.stop(); meterTask?.cancel()
             if practice { lifecycle.didFinish(); finished = true; endMonitoring(); restoreIdleTimer() }
             else {
@@ -122,8 +163,9 @@ final class RecordingModel {
         }
     }
 
-    private func captureFinished(url: URL, captureError: String?, usable: Bool) async {
+    func captureFinished(url: URL, captureError: String?, usable: Bool) async {
         playback.stop(); lifecycle.didFinish(); endMonitoring()
+        await camera.suspendPreview()
         defer { finished = true; restoreIdleTimer(); endBackgroundTask(); library.reloadTakes() }
         guard let take else { error = "ההקלטה הסתיימה ללא רשומת טייק. הקובץ לא נמחק."; return }
         do {
@@ -145,9 +187,23 @@ final class RecordingModel {
         settings.wordsPerMinute = value; settings.pace = .words
         playback.setDuration(settings.duration(wordCount: script.wordCount))
     }
+    func prepareRetake() async -> Bool {
+        guard finished, !hasLeft, !Task.isCancelled else { return false }
+        if !practice {
+            let ready = await camera.prepareRecording()
+            guard !hasLeft, !Task.isCancelled else {
+                await camera.suspendPreview()
+                return false
+            }
+            guard ready else { error = camera.error; return false }
+        }
+        return !hasLeft && !Task.isCancelled
+    }
+
     func leave() {
+        hasLeft = true
         countdownTask?.cancel(); playback.stop(); endMonitoring(); restoreIdleTimer()
-        camera.onStarted = nil; camera.onFinished = nil
+        camera.onStarted = nil; camera.onPaused = nil; camera.onResumed = nil; camera.onFinished = nil
         endBackgroundTask()
     }
     private func endMonitoring() {

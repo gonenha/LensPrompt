@@ -63,6 +63,14 @@ final class LibraryModel {
         catch { self.error = error.localizedDescription }
     }
 
+    @discardableResult func deleteTake(_ take: Take) -> Bool {
+        do {
+            try disk.deleteTake(id: take.id)
+            reloadTakes()
+            return true
+        } catch { self.error = "לא ניתן למחוק את הטייק. " + error.localizedDescription; return false }
+    }
+
     func duplicate(_ script: Script) {
         upsert(script.duplicated())
     }
