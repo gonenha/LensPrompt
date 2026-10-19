@@ -12,19 +12,25 @@
 		0E1062503C178E3DF4678348 /* CapturePreparation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7F01CABDCF4C2A9C5E0AF6 /* CapturePreparation.swift */; };
 		101E319439A674910CBDFB67 /* AIViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE15A07813A100DF01D2E6FA /* AIViews.swift */; };
 		1165ED7333B25FDDE347E49E /* LibraryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501A5C521117B63BF8AFEDB7 /* LibraryViews.swift */; };
+		155C5C644CD44DC11E691A17 /* FeedbackAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E21E89D4B3F7EC8CE40C501 /* FeedbackAI.swift */; };
 		15B5CA4FD64F8A20767ACE82 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E7E3D5C802F8C0AAFC6258 /* SetupView.swift */; };
 		3AF4D6430DC16A1AB18384FE /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 94019986F77BB6B77092F734 /* LaunchScreen.storyboard */; };
 		40CF2EEC2BB8710E38A90586 /* FlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D034DB05961429BFABD37677 /* FlowTests.swift */; };
+		4176DD24196CEC9BDA11B2C9 /* FeedbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C4B8D5D69126A61AA30228 /* FeedbackTests.swift */; };
 		4667681A8F7654161872D8A3 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42CDD1DF662297F73575EC4 /* PlaybackModel.swift */; };
+		53DAC5C74CB2EAC38D28AAB8 /* FeedbackSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102BE53C507BD8FE9BB5B924 /* FeedbackSettingsView.swift */; };
 		6D15EF69D2E030AE4F3E12EE /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DDD33D05779BC5C25574396 /* LibraryModel.swift */; };
 		6D2D82CA8D8E2F0F2D1D4105 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1928260F4AFB4DC17417F4 /* RecordingView.swift */; };
 		7EE90815CACE2A8AF9FE4E23 /* TakesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C345042E353C87EA6B2DF75B /* TakesView.swift */; };
+		900141C3D0556B7A895BAA37 /* FeedbackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE746763468FFFA6D44F3C4 /* FeedbackModel.swift */; };
 		9BD9168C7F3B9C6EFB5A72FA /* CameraModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3372C90ACAE334FBBC0D91D /* CameraModel.swift */; };
 		9F13F630E17620763AC8DC74 /* LensPromptApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEF593499FBCC159DA47B42 /* LensPromptApp.swift */; };
+		AB93727FF961BB9DF3F78870 /* FeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A0070E09552277ED2C93FBF /* FeedbackView.swift */; };
 		B7EBEFD6231951AD5B8599C7 /* RecordingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70C413A15CCC85521D03FC8 /* RecordingModel.swift */; };
 		BE9E0BA2673776965FB97E6B /* CameraPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A37368C304B0A14CF27A20EE /* CameraPreview.swift */; };
 		C82D8CDB8A37A6B796F45993 /* PromptOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70229A0E4B7F593BB40344D4 /* PromptOverlay.swift */; };
 		D969E85A683847445DF0A404 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4CB3648C83F9C18C1A47E413 /* Assets.xcassets */; };
+		E938DF94E33CFF7B8B0A9C04 /* FeedbackMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E5BEFFC783FA261967ABF4E /* FeedbackMedia.swift */; };
 		F124B7442CE0ECD394F5E061 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 518C9364D64A26E2759A1E7F /* Theme.swift */; };
 		F720B9E58E751303D014E27F /* PromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D24539D5B55731F0CAFB6457 /* PromptTests.swift */; };
 		F9D77D95DA9ADD4778E2DAB5 /* PrompterCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7536B0CC44364AD4AFA8E629 /* PrompterCore */; };
@@ -50,13 +56,18 @@
 /* Begin PBXFileReference section */
 		0411DBF0DDF7FFF237DDB52C /* AIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIService.swift; sourceTree = "<group>"; };
 		0730FA58DD6D3BEB258799ED /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		102BE53C507BD8FE9BB5B924 /* FeedbackSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackSettingsView.swift; sourceTree = "<group>"; };
+		1E21E89D4B3F7EC8CE40C501 /* FeedbackAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackAI.swift; sourceTree = "<group>"; };
 		263E4D5BB6C98D4D6BE59074 /* LensPromptTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LensPromptTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2E7277017E6332EBA5BEA29D /* LensPromptUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LensPromptUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3F7F01CABDCF4C2A9C5E0AF6 /* CapturePreparation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePreparation.swift; sourceTree = "<group>"; };
 		4CB3648C83F9C18C1A47E413 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4FE746763468FFFA6D44F3C4 /* FeedbackModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModel.swift; sourceTree = "<group>"; };
 		501A5C521117B63BF8AFEDB7 /* LibraryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViews.swift; sourceTree = "<group>"; };
 		518C9364D64A26E2759A1E7F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		52E7E3D5C802F8C0AAFC6258 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
+		5E5BEFFC783FA261967ABF4E /* FeedbackMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackMedia.swift; sourceTree = "<group>"; };
+		6A0070E09552277ED2C93FBF /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
 		6AEF593499FBCC159DA47B42 /* LensPromptApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LensPromptApp.swift; sourceTree = "<group>"; };
 		6DDD33D05779BC5C25574396 /* LibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModel.swift; sourceTree = "<group>"; };
 		70229A0E4B7F593BB40344D4 /* PromptOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptOverlay.swift; sourceTree = "<group>"; };
@@ -64,6 +75,7 @@
 		7E1928260F4AFB4DC17417F4 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		94019986F77BB6B77092F734 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A37368C304B0A14CF27A20EE /* CameraPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreview.swift; sourceTree = "<group>"; };
+		A9C4B8D5D69126A61AA30228 /* FeedbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackTests.swift; sourceTree = "<group>"; };
 		AE15A07813A100DF01D2E6FA /* AIViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIViews.swift; sourceTree = "<group>"; };
 		B42CDD1DF662297F73575EC4 /* PlaybackModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackModel.swift; sourceTree = "<group>"; };
 		C345042E353C87EA6B2DF75B /* TakesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakesView.swift; sourceTree = "<group>"; };
@@ -100,6 +112,7 @@
 		50704460BAAEC6231C787314 /* UnitTests */ = {
 			isa = PBXGroup;
 			children = (
+				A9C4B8D5D69126A61AA30228 /* FeedbackTests.swift */,
 				D24539D5B55731F0CAFB6457 /* PromptTests.swift */,
 			);
 			path = UnitTests;
@@ -123,6 +136,11 @@
 				F3372C90ACAE334FBBC0D91D /* CameraModel.swift */,
 				A37368C304B0A14CF27A20EE /* CameraPreview.swift */,
 				3F7F01CABDCF4C2A9C5E0AF6 /* CapturePreparation.swift */,
+				1E21E89D4B3F7EC8CE40C501 /* FeedbackAI.swift */,
+				5E5BEFFC783FA261967ABF4E /* FeedbackMedia.swift */,
+				4FE746763468FFFA6D44F3C4 /* FeedbackModel.swift */,
+				102BE53C507BD8FE9BB5B924 /* FeedbackSettingsView.swift */,
+				6A0070E09552277ED2C93FBF /* FeedbackView.swift */,
 				0730FA58DD6D3BEB258799ED /* Info.plist */,
 				94019986F77BB6B77092F734 /* LaunchScreen.storyboard */,
 				6AEF593499FBCC159DA47B42 /* LensPromptApp.swift */,
@@ -283,6 +301,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4176DD24196CEC9BDA11B2C9 /* FeedbackTests.swift in Sources */,
 				F720B9E58E751303D014E27F /* PromptTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -297,6 +316,11 @@
 				9BD9168C7F3B9C6EFB5A72FA /* CameraModel.swift in Sources */,
 				BE9E0BA2673776965FB97E6B /* CameraPreview.swift in Sources */,
 				0E1062503C178E3DF4678348 /* CapturePreparation.swift in Sources */,
+				155C5C644CD44DC11E691A17 /* FeedbackAI.swift in Sources */,
+				E938DF94E33CFF7B8B0A9C04 /* FeedbackMedia.swift in Sources */,
+				900141C3D0556B7A895BAA37 /* FeedbackModel.swift in Sources */,
+				53DAC5C74CB2EAC38D28AAB8 /* FeedbackSettingsView.swift in Sources */,
+				AB93727FF961BB9DF3F78870 /* FeedbackView.swift in Sources */,
 				9F13F630E17620763AC8DC74 /* LensPromptApp.swift in Sources */,
 				6D15EF69D2E030AE4F3E12EE /* LibraryModel.swift in Sources */,
 				1165ED7333B25FDDE347E49E /* LibraryViews.swift in Sources */,

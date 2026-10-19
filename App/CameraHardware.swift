@@ -3,15 +3,30 @@ import Foundation
 import os
 import QuartzCore
 
+// Bounded local diagnostics: lifecycle labels and hardware state only, never media or scripts.
+enum CaptureTrace {
+    private static let lines = OSAllocatedUnfairLock(initialState: [String]())
+    static let url = URL.cachesDirectory.appendingPathComponent("capture-diagnostic.txt")
+    static func record(_ label: String, reset: Bool = false) {
+        lines.withLock { entries in
+            if reset { entries.removeAll() }
+            entries.append("\(ProcessInfo.processInfo.systemUptime): \(label)")
+            if entries.count > 100 { entries.removeFirst(entries.count - 100) }
+            try? entries.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+}
+
 enum CaptureEvent: Sendable {
     case started, paused, resumed
     case finished(URL, error: String?, usable: Bool)
 }
 
-private final class MovieDelegate: NSObject, AVCaptureFileOutputRecordingDelegate, Sendable {
+final class MovieDelegate: NSObject, AVCaptureFileOutputRecordingDelegate, Sendable {
     let continuation: AsyncStream<CaptureEvent>.Continuation
     init(_ continuation: AsyncStream<CaptureEvent>.Continuation) { self.continuation = continuation }
     func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+        CaptureTrace.record("delegate.started")
         continuation.yield(.started)
     }
     @available(iOS 18.0, *)
@@ -24,8 +39,10 @@ private final class MovieDelegate: NSObject, AVCaptureFileOutputRecordingDelegat
     }
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo url: URL, from connections: [AVCaptureConnection], error: (any Error)?) {
         let nsError = error as NSError?
+        CaptureTrace.record("delegate.finished code=\(nsError?.code ?? 0) duration=\(output.recordedDuration.seconds)")
         let usable = error == nil || (nsError?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true)
-        continuation.yield(.finished(url, error: error?.localizedDescription, usable: usable))
+        let diagnostic = nsError.map { "\($0.localizedDescription) [\($0.domain) \($0.code)]" }
+        continuation.yield(.finished(url, error: diagnostic, usable: usable))
     }
 }
 
@@ -50,7 +67,7 @@ actor CameraHardware {
     nonisolated(unsafe) let session = AVCaptureSession()
     nonisolated let events: AsyncStream<CaptureEvent>
     private let delegate: MovieDelegate
-    private let output = AVCaptureMovieFileOutput()
+    private let output = CameraHardware.makeMovieOutput()
     private let meter = AVCaptureAudioDataOutput()
     private let meterDelegate = MeterDelegate()
     private let meterQueue = DispatchQueue(label: "personal.lensprompt.meter")
@@ -65,7 +82,16 @@ actor CameraHardware {
         events = stream.stream; delegate = MovieDelegate(stream.continuation)
     }
 
+    nonisolated static func makeMovieOutput() -> AVCaptureMovieFileOutput {
+        let output = AVCaptureMovieFileOutput()
+        // Feedback starts recording immediately, before a preview has delivered
+        // its first frame. Prepare recording resources with the session itself.
+        if #available(iOS 26.0, *) { output.isDeferredStartEnabled = false }
+        return output
+    }
+
     func preparePreview() throws {
+        CaptureTrace.record("hardware.preparePreview running=\(session.isRunning)")
         if !videoConfigured {
             guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
                 throw CameraFailure.unavailable
@@ -98,6 +124,7 @@ actor CameraHardware {
     }
 
     func prepareMicrophone() throws {
+        CaptureTrace.record("hardware.prepareMicrophone running=\(session.isRunning)")
         try AVAudioSession.sharedInstance().setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetoothHFP])
         // Advisory protection only: banners/Focus remain controlled by the user.
         try? AVAudioSession.sharedInstance().setPrefersNoInterruptionsFromSystemAlerts(true)
@@ -145,6 +172,10 @@ actor CameraHardware {
     }
 
     func startMovie(at url: URL) throws {
+        CaptureTrace.record("hardware.startMovie running=\(session.isRunning) interrupted=\(session.isInterrupted) exists=\(FileManager.default.fileExists(atPath: url.path))")
+        for connection in output.connections {
+            CaptureTrace.record("connection active=\(connection.isActive) enabled=\(connection.isEnabled) ports=\(connection.inputPorts.map { $0.mediaType.rawValue }.joined(separator: ","))")
+        }
         guard session.isRunning, videoConfigured, microphoneConfigured, !hasOpenMovie else { throw CameraFailure.unavailable }
         output.startRecording(to: url, recordingDelegate: delegate)
     }
@@ -156,8 +187,9 @@ actor CameraHardware {
         guard #available(iOS 18.0, *), output.isRecordingPaused else { throw CameraFailure.unavailable }
         output.resumeRecording()
     }
-    func stopMovie() { if hasOpenMovie { output.stopRecording() } }
+    func stopMovie() { CaptureTrace.record("hardware.stopMovie open=\(hasOpenMovie)"); if hasOpenMovie { output.stopRecording() } }
     func suspend() {
+        CaptureTrace.record("hardware.suspend open=\(hasOpenMovie) running=\(session.isRunning)")
         guard !hasOpenMovie else { output.stopRecording(); return }
         if session.isRunning { session.stopRunning() }
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)

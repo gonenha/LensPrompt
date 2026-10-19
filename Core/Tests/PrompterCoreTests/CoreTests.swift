@@ -434,3 +434,38 @@ private func stageBridge(_ data: Data, id: UUID, store: ScriptLibrary, ready: Bo
     #expect(throws: (any Error).self) { try ScriptVariants.decode(Data("{}".utf8), source: source) }
     #expect(throws: (any Error).self) { try ScriptVariants.decode(Data(String(decoding: payload, as: UTF8.self).replacingOccurrences(of: "קצר", with: " ").utf8), source: source) }
 }
+
+@Test func feedbackRulesBoundDurationAndDoNotInventSpeechRate() throws {
+    #expect(FeedbackRules.validDuration(6))
+    #expect(FeedbackRules.validDuration(8))
+    #expect(!FeedbackRules.validDuration(5.9))
+    #expect(!FeedbackRules.validDuration(.nan))
+    #expect(FeedbackTarget.shortVideo.orientation == "אנכי")
+    #expect(FeedbackTarget.wideVideo.orientation == "רוחבי")
+    let findings = FeedbackRules.findings(.init(brightness: 0.1, clippedPixels: 0, sharpness: 8, faceCount: 0, faceTouchesEdge: false, silenceFraction: 1, clippingFraction: 0, width: 1080, height: 1920), target: .wideVideo)
+    #expect(findings.contains { $0.id == "dark" })
+    #expect(findings.contains { $0.id == "face-unknown" })
+    #expect(findings.contains { $0.id == "orientation" })
+    #expect(!findings.contains { $0.title.contains("בדקה") })
+}
+
+@Test func videoProofExpiresAndBindsToCredentialsContractAndModel() {
+    let now = Date()
+    let proof = VideoCapabilityProof(identity: "one", checkedAt: now)
+    #expect(proof.valid(identity: "one", now: now))
+    #expect(!proof.valid(identity: "two", now: now))
+    #expect(!proof.valid(identity: "one", now: now.addingTimeInterval(8 * 86400)))
+    #expect(!proof.valid(identity: "one", now: now.addingTimeInterval(-100)))
+}
+
+@Test func feedbackReportRejectsOutOfScopeOrIncompleteModelAdvice() throws {
+    let good = Data("""
+    {"positive":"","recommendations":[{"category":"lighting","observation":"צל על הפנים","action":"הזז את האור קדימה","limitation":"מבוסס על מקטע קצר"}]}
+    """.utf8)
+    #expect(try FeedbackReport.decode(good).recommendations.count == 1)
+    let outOfScope = Data(String(decoding: good, as: UTF8.self).replacingOccurrences(of: "lighting", with: "health").utf8)
+    #expect(throws: (any Error).self) { try FeedbackReport.decode(outOfScope) }
+    let incomplete = Data("{\"positive\":\"\",\"recommendations\":[{\"category\":\"angle\",\"observation\":\"a\"}]}".utf8)
+    #expect(throws: (any Error).self) { try FeedbackReport.decode(incomplete) }
+    #expect(try FeedbackReport.decode(Data("{\"positive\":\"\",\"recommendations\":[]}".utf8)).recommendations.isEmpty)
+}

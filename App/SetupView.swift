@@ -9,6 +9,7 @@ struct SetupView: View {
     @State private var presenting = false
     @State private var preparation = CapturePreparation()
     @State private var practice = true
+    @State private var feedback = false
     @State private var voicePermissionDenied = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -109,6 +110,10 @@ struct SetupView: View {
                     startPractice()
                 } label: { Label("תרגול ללא צילום", systemImage: "play") }
                     .buttonStyle(MainButtonStyle(secondary: true)).disabled(preparation.busy || !script.canStart).accessibilityIdentifier("rehearse")
+                Button {
+                    preparation.begin(operation: { await camera.suspendPreview(); return true }, ready: { feedback = true })
+                } label: { Label("תרגול עם משוב צילום", systemImage: "sparkles.rectangle.stack") }
+                    .buttonStyle(MainButtonStyle(secondary: true)).disabled(preparation.busy || !script.canStart).accessibilityIdentifier("feedback-practice")
                 if camera.permissionDenied {
                     Button("פתיחת הגדרות הרשאות") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }.font(.footnote)
                 }
@@ -117,13 +122,17 @@ struct SetupView: View {
             .overlay { if preparation.busy { BrandLoadingView(title: "מכינים את האולפן…", cancel: { preparation.cancel() }) } }
             .task { await camera.preparePreviewIfAuthorized() }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active && !presenting && !preparation.busy { Task { await camera.preparePreviewIfAuthorized() } }
-                else if phase == .background && !presenting { preparation.cancel(); Task { await camera.suspendPreview() } }
+                if phase == .active && !presenting && !feedback && !preparation.busy { Task { await camera.preparePreviewIfAuthorized() } }
+                else if phase == .background && !presenting && !feedback { preparation.cancel(); Task { await camera.suspendPreview() } }
             }
-            .onDisappear { if !presenting { preparation.cancel(); Task { await camera.suspendPreview() } } }
+            .onDisappear { if !presenting && !feedback { preparation.cancel(); Task { await camera.suspendPreview() } } }
             .fullScreenCover(isPresented: $presenting, onDismiss: { Task { await camera.preparePreviewIfAuthorized() } }) {
                 RecordingView(library: library, script: $script, camera: camera, practice: practice)
                     .onAppear { preparation.didPresent() }
+                    .environment(\.layoutDirection, .rightToLeft).environment(\.locale, Locale(identifier: "he_IL"))
+            }
+            .fullScreenCover(isPresented: $feedback, onDismiss: { Task { await camera.preparePreviewIfAuthorized() } }) {
+                FeedbackView(script: script).onAppear { preparation.didPresent() }
                     .environment(\.layoutDirection, .rightToLeft).environment(\.locale, Locale(identifier: "he_IL"))
             }
             .alert("נדרשת גישה למיקרופון למעקב לפי קול", isPresented: $voicePermissionDenied) {

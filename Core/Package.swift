@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [.library(name: "PrompterCore", targets: ["PrompterCore"])],
     targets: [
-        .target(name: "PrompterCore", sources: ["Models.swift", "ScriptVariants.swift", "Library.swift", "ScrollClock.swift", "CaptureLifecycle.swift", "WordCue.swift", "CodexTransfer.swift", "TakeExport.swift"]),
+        .target(name: "PrompterCore", sources: ["Models.swift", "Feedback.swift", "ScriptVariants.swift", "Library.swift", "ScrollClock.swift", "CaptureLifecycle.swift", "WordCue.swift", "CodexTransfer.swift", "TakeExport.swift"]),
         .testTarget(name: "PrompterCoreTests", dependencies: ["PrompterCore"], sources: ["CoreTests.swift"])
     ]
 )

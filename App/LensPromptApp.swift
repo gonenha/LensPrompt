@@ -8,6 +8,7 @@ struct LensPromptApp: App {
     @State private var startupError: String?
 
     init() {
+        FeedbackMedia.cleanStaleSessions()
         do {
             let root = URL.documentsDirectory.appendingPathComponent("LensPrompt", isDirectory: true)
             _library = State(initialValue: LibraryModel(disk: try ScriptLibrary(root: root)))
