@@ -19,6 +19,14 @@ final class LibraryModel {
             return TakeGroup(takes: members, title: title.isEmpty ? "ללא כותרת" : title)
         }.sorted { ($0.takes.map(\.createdAt).max() ?? .distantPast) > ($1.takes.map(\.createdAt).max() ?? .distantPast) }
     }
+    var scriptFamilies: [ScriptFamily] {
+        Dictionary(grouping: scripts, by: { $0.sourceScriptID ?? $0.id }).map { id, members in
+            ScriptFamily(id: id, scripts: members.sorted {
+                if ($0.id == id) != ($1.id == id) { return $0.id == id }
+                return $0.updatedAt > $1.updatedAt
+            })
+        }.sorted { ($0.scripts.map(\.updatedAt).max() ?? .distantPast) > ($1.scripts.map(\.updatedAt).max() ?? .distantPast) }
+    }
     func takes(for scriptID: UUID) -> [Take] { takes.filter { $0.scriptID == scriptID } }
 
     @discardableResult func rateTake(_ take: Take, rating: TakeRating) -> Bool {
@@ -74,6 +82,17 @@ final class LibraryModel {
         catch { hasUnsavedChanges = true; self.error = "השמירה נכשלה. המלל עדיין פתוח; נסה שוב לפני סגירת האפליקציה. \(error.localizedDescription)" }
     }
 
+    @discardableResult func saveVariants(_ variants: [Script]) -> Bool {
+        guard scriptsLoaded, !hasUnsavedChanges, variants.count == 3,
+              Set(variants.map(\.id)).count == 3,
+              variants.allSatisfy({ candidate in !scripts.contains(where: { $0.id == candidate.id }) }) else {
+            error = "לא ניתן לשמור גרסאות כרגע. ודא שהמקור נשמר ונסה שוב."; return false
+        }
+        let updated = (scripts + variants).sorted { $0.updatedAt > $1.updatedAt }
+        do { try disk.saveScripts(updated); scripts = updated; return true }
+        catch { self.error = "שמירת הגרסאות נכשלה; לא נשמרה קבוצה חלקית."; return false }
+    }
+
     func deleteScript(_ script: Script) {
         do {
             let remaining = scripts.filter { $0.id != script.id }
@@ -107,3 +126,5 @@ final class LibraryModel {
         } catch { self.error = error.localizedDescription; return nil }
     }
 }
+
+struct ScriptFamily: Identifiable { let id: UUID; let scripts: [Script] }

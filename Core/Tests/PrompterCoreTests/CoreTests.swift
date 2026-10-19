@@ -420,3 +420,17 @@ private func stageBridge(_ data: Data, id: UUID, store: ScriptLibrary, ready: Bo
     let remaining = (try? FileManager.default.contentsOfDirectory(atPath: exports.path)) ?? []
     #expect(remaining.isEmpty)
 }
+
+@Test func generatedStylesAreCompleteDistinctAndPreserveSource() throws {
+    let source = Script(title: "מקור", text: "עובדות מקוריות")
+    let payload = Data("""
+    {"dynamic":{"text":"קצב חדש","opening":"א","pain":"ב","solution":"ג","offer":"ד"},"empathetic":{"text":"סיפור אישי","opening":"א","pain":"ב","solution":"ג","offer":"ד"},"concise":{"text":"קצר","opening":"א","pain":"ב","solution":"ג","offer":"ד"}}
+    """.utf8)
+    let scripts = try ScriptVariants.decode(payload, source: source)
+    #expect(scripts.count == 3)
+    #expect(Set(scripts.map(\.id)).count == 3)
+    #expect(scripts.allSatisfy { $0.sourceScriptID == source.id && $0.activeTalkingPoints.count == 4 })
+    #expect(source.text == "עובדות מקוריות")
+    #expect(throws: (any Error).self) { try ScriptVariants.decode(Data("{}".utf8), source: source) }
+    #expect(throws: (any Error).self) { try ScriptVariants.decode(Data(String(decoding: payload, as: UTF8.self).replacingOccurrences(of: "קצר", with: " ").utf8), source: source) }
+}

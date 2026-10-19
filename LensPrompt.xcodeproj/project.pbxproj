@@ -7,7 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		026CDF299F0B9EE7593560D7 /* AIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0411DBF0DDF7FFF237DDB52C /* AIService.swift */; };
 		07F70F2A7A1099F92EE6BBFB /* CameraHardware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76337F04E3FA2EE0C1E95365 /* CameraHardware.swift */; };
+		0E1062503C178E3DF4678348 /* CapturePreparation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7F01CABDCF4C2A9C5E0AF6 /* CapturePreparation.swift */; };
+		101E319439A674910CBDFB67 /* AIViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE15A07813A100DF01D2E6FA /* AIViews.swift */; };
 		1165ED7333B25FDDE347E49E /* LibraryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501A5C521117B63BF8AFEDB7 /* LibraryViews.swift */; };
 		15B5CA4FD64F8A20767ACE82 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E7E3D5C802F8C0AAFC6258 /* SetupView.swift */; };
 		3AF4D6430DC16A1AB18384FE /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 94019986F77BB6B77092F734 /* LaunchScreen.storyboard */; };
@@ -45,9 +48,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0411DBF0DDF7FFF237DDB52C /* AIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIService.swift; sourceTree = "<group>"; };
 		0730FA58DD6D3BEB258799ED /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		263E4D5BB6C98D4D6BE59074 /* LensPromptTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LensPromptTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2E7277017E6332EBA5BEA29D /* LensPromptUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = LensPromptUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3F7F01CABDCF4C2A9C5E0AF6 /* CapturePreparation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CapturePreparation.swift; sourceTree = "<group>"; };
 		4CB3648C83F9C18C1A47E413 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		501A5C521117B63BF8AFEDB7 /* LibraryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViews.swift; sourceTree = "<group>"; };
 		518C9364D64A26E2759A1E7F /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -59,13 +64,14 @@
 		7E1928260F4AFB4DC17417F4 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		94019986F77BB6B77092F734 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		A37368C304B0A14CF27A20EE /* CameraPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreview.swift; sourceTree = "<group>"; };
+		AE15A07813A100DF01D2E6FA /* AIViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIViews.swift; sourceTree = "<group>"; };
 		B42CDD1DF662297F73575EC4 /* PlaybackModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackModel.swift; sourceTree = "<group>"; };
 		C345042E353C87EA6B2DF75B /* TakesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TakesView.swift; sourceTree = "<group>"; };
-		C6A179371F1D150E0454706E /* LensPrompt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LensPrompt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C6A179371F1D150E0454706E /* LensPrompt.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LensPrompt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C70C413A15CCC85521D03FC8 /* RecordingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingModel.swift; sourceTree = "<group>"; };
 		D034DB05961429BFABD37677 /* FlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTests.swift; sourceTree = "<group>"; };
 		D24539D5B55731F0CAFB6457 /* PromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptTests.swift; sourceTree = "<group>"; };
-		DF3BAA34D75EA33339B83056 /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Core; sourceTree = SOURCE_ROOT; };
+		DF3BAA34D75EA33339B83056 /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Core; sourceTree = SOURCE_ROOT; };
 		F3372C90ACAE334FBBC0D91D /* CameraModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -110,10 +116,13 @@
 		AE33E3D8953143141A0386C8 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				0411DBF0DDF7FFF237DDB52C /* AIService.swift */,
+				AE15A07813A100DF01D2E6FA /* AIViews.swift */,
 				4CB3648C83F9C18C1A47E413 /* Assets.xcassets */,
 				76337F04E3FA2EE0C1E95365 /* CameraHardware.swift */,
 				F3372C90ACAE334FBBC0D91D /* CameraModel.swift */,
 				A37368C304B0A14CF27A20EE /* CameraPreview.swift */,
+				3F7F01CABDCF4C2A9C5E0AF6 /* CapturePreparation.swift */,
 				0730FA58DD6D3BEB258799ED /* Info.plist */,
 				94019986F77BB6B77092F734 /* LaunchScreen.storyboard */,
 				6AEF593499FBCC159DA47B42 /* LensPromptApp.swift */,
@@ -282,9 +291,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				026CDF299F0B9EE7593560D7 /* AIService.swift in Sources */,
+				101E319439A674910CBDFB67 /* AIViews.swift in Sources */,
 				07F70F2A7A1099F92EE6BBFB /* CameraHardware.swift in Sources */,
 				9BD9168C7F3B9C6EFB5A72FA /* CameraModel.swift in Sources */,
 				BE9E0BA2673776965FB97E6B /* CameraPreview.swift in Sources */,
+				0E1062503C178E3DF4678348 /* CapturePreparation.swift in Sources */,
 				9F13F630E17620763AC8DC74 /* LensPromptApp.swift in Sources */,
 				6D15EF69D2E030AE4F3E12EE /* LibraryModel.swift in Sources */,
 				1165ED7333B25FDDE347E49E /* LibraryViews.swift in Sources */,

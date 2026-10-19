@@ -355,3 +355,156 @@ import SwiftUI
     var renamed = script; renamed.title = "שם חדש"; library.upsert(renamed)
     #expect(library.takeGroups.first(where: { $0.scriptID == script.id })?.title == "שם חדש")
 }
+
+@Test @MainActor func preparationIsImmediateDeduplicatedAndCancelable() async {
+    let state = CapturePreparation()
+    var calls = 0
+    var presented = 0
+    state.begin(operation: { calls += 1; return true }, ready: { presented += 1 })
+    #expect(state.busy)
+    state.begin(operation: { calls += 1; return true }, ready: { presented += 1 })
+    for _ in 0..<10 { await Task.yield() }
+    #expect(calls == 1)
+    #expect(presented == 1)
+    #expect(state.busy)
+    state.didPresent()
+    #expect(!state.busy)
+    state.begin(operation: { try? await Task.sleep(for: .seconds(10)); return true }, ready: { presented += 1 })
+    state.cancel()
+    for _ in 0..<10 { await Task.yield() }
+    #expect(!state.busy)
+    #expect(presented == 1)
+}
+
+@Test @MainActor func providerContractsKeepCredentialsOutOfURLsAndRejectTruncation() throws {
+    let source = Script(title: "מקור", text: "תוכן")
+    for provider in AIProvider.allCases {
+        let request = try AIContract.request(provider: provider, model: provider.defaultModel, key: "fixture-secret", source: source)
+        #expect(request.url?.scheme == "https")
+        #expect(request.url?.query == nil)
+        #expect(!request.url!.absoluteString.contains("fixture-secret"))
+        #expect(!String(decoding: request.httpBody!, as: UTF8.self).contains("fixture-secret"))
+        #expect(throws: (any Error).self) { try AIContract.output(provider: provider, data: Data("{}".utf8)) }
+    }
+}
+
+@Test @MainActor func keychainReplaceDeleteAndNoPlaintextPersistence() throws {
+    let store = APIKeyStore(service: "lensprompt.tests." + UUID().uuidString)
+    defer { try? store.delete(.openAI) }
+    #expect(try store.read(.openAI) == nil)
+    try store.save("dummy-one", provider: .openAI)
+    #expect(try store.read(.openAI) == "dummy-one")
+    try store.save("dummy-two", provider: .openAI)
+    #expect(try store.read(.openAI) == "dummy-two")
+    #expect(try store.read(.gemini) == nil)
+    try store.delete(.openAI)
+    #expect(try store.read(.openAI) == nil)
+}
+
+@Test @MainActor func providerOutputsAcceptOnlyCompleteText() throws {
+    let payload = "{\"dynamic\":{}}"
+    func data(_ object: [String: Any]) throws -> Data { try JSONSerialization.data(withJSONObject: object) }
+    let cases: [(AIProvider, [String: Any], String, String)] = [
+        (.openAI, ["status": "completed", "output": [["type": "message", "content": [["type": "output_text", "text": payload]]]]], "status", "incomplete"),
+        (.gemini, ["candidates": [["finishReason": "STOP", "content": ["parts": [["text": payload]]]]]], "", ""),
+        (.claude, ["stop_reason": "end_turn", "content": [["type": "text", "text": payload]]], "stop_reason", "max_tokens")
+    ]
+    for (provider, body, key, bad) in cases {
+        #expect(try AIContract.output(provider: provider, data: data(body)) == Data(payload.utf8))
+        var truncated = body
+        if provider == .gemini { truncated = ["candidates": [["finishReason": "MAX_TOKENS", "content": ["parts": [["text": payload]]]]]] }
+        else { truncated[key] = bad }
+        #expect(throws: (any Error).self) { try AIContract.output(provider: provider, data: data(truncated)) }
+    }
+    #expect(throws: (any Error).self) { try AIContract.request(provider: .gemini, model: "bad/key?secret", key: "fixture", source: nil) }
+    #expect(throws: (any Error).self) { try AIContract.output(provider: .openAI, data: data(["status": "completed", "output": [["type": "message", "content": [["type": "refusal", "refusal": "no"]]]]])) }
+}
+
+@Test @MainActor func variantBatchIsAtomicAndFamiliesUseIDs() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let library = LibraryModel(disk: try ScriptLibrary(root: root))
+    let source = Script(title: "אותו שם", text: "מקור")
+    library.upsert(source)
+    library.upsert(Script(title: "אותו שם", text: "אחר"))
+    var variants = ScriptStyle.allCases.map { style in
+        var script = Script(title: source.title, text: "נוסח חדש")
+        script.sourceScriptID = source.id; script.scriptStyle = style; return script
+    }
+    let before = library.scripts
+    let file = root.appendingPathComponent("scripts.json")
+    try FileManager.default.removeItem(at: file)
+    try FileManager.default.createDirectory(at: file, withIntermediateDirectories: true)
+    #expect(!library.saveVariants(variants))
+    #expect(library.scripts == before)
+    try FileManager.default.removeItem(at: file)
+    #expect(library.saveVariants(variants))
+    #expect(library.scriptFamilies.first(where: { $0.id == source.id })?.scripts.count == 4)
+    #expect(library.scripts.first(where: { $0.id == source.id })?.text == "מקור")
+    variants[0].text = "עריכה עצמאית"; library.upsert(variants[0])
+    #expect(try library.disk.loadScripts().first(where: { $0.id == variants[0].id })?.text == "עריכה עצמאית")
+    #expect(!library.saveVariants(variants))
+}
+
+@Test @MainActor func speakingPointsOnlyCanGenerateAndInputIsBounded() throws {
+    var source = Script(title: "נקודות בלבד")
+    source.presentationMode = .talkingPoints
+    source.setPointText("הפתיח שלי", for: .opening)
+    #expect(AIContract.canGenerate(source))
+    for provider in AIProvider.allCases {
+        #expect(try AIContract.request(provider: provider, model: provider.defaultModel, key: "dummy", source: source).httpBody != nil)
+    }
+    source.setPointText(String(repeating: "א", count: 20_001), for: .pain)
+    #expect(!AIContract.canGenerate(source))
+}
+
+private final class AITransportFixture: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "fixture.invalid" }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let status = request.url!.path == "/quota" ? 429 : 200
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("{\"safe\":true}".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@Test @MainActor func transportUsesInjectedSessionAndSanitizesErrors() async throws {
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [AITransportFixture.self]
+    let client = AIClient(configuration: config)
+    let data = try await client.send(URLRequest(url: URL(string: "https://fixture.invalid/success")!))
+    #expect(String(decoding: data, as: UTF8.self) == "{\"safe\":true}")
+    do {
+        _ = try await client.send(URLRequest(url: URL(string: "https://fixture.invalid/quota")!))
+        Issue.record("Expected quota failure")
+    } catch let error as AIError {
+        guard case .quota = error else { Issue.record("Incorrect error"); return }
+    }
+    let redirectAllowed = await withCheckedContinuation { continuation in
+        let session = URLSession.shared
+        let task = session.dataTask(with: URL(string: "https://fixture.invalid")!)
+        let response = HTTPURLResponse(url: URL(string: "https://fixture.invalid")!, statusCode: 302, httpVersion: nil, headerFields: nil)!
+        NoRedirects().urlSession(session, task: task, willPerformHTTPRedirection: response, newRequest: URLRequest(url: URL(string: "https://other.invalid")!)) { continuation.resume(returning: $0 != nil) }
+    }
+    #expect(!redirectAllowed)
+}
+
+@Test @MainActor func canceledPreparationIgnoresLatePermissionCompletion() async {
+    let state = CapturePreparation()
+    var pending: CheckedContinuation<Bool, Never>?
+    var presented = 0
+    state.begin(operation: { await withCheckedContinuation { pending = $0 } }, ready: { presented += 1 })
+    while pending == nil { await Task.yield() }
+    state.cancel()
+    state.begin(operation: { true }, ready: { presented += 10 })
+    for _ in 0..<10 { await Task.yield() }
+    pending?.resume(returning: true)
+    for _ in 0..<10 { await Task.yield() }
+    #expect(presented == 10)
+    #expect(state.busy)
+    state.didPresent()
+    #expect(!state.busy)
+}

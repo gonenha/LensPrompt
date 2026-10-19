@@ -69,6 +69,9 @@ struct RecordingView: View {
                         Button("ביטול וחזרה") { model.stop() }.buttonStyle(.bordered).tint(.white).accessibilityIdentifier("cancel-countdown")
                     }
                 }
+                if !model.finished && (model.lifecycle.phase == .idle || model.lifecycle.phase == .starting || (model.practice && model.lifecycle.phase == .countdown)) {
+                    BrandLoadingView(title: "מכינים את האולפן…", cancel: { model.stop() })
+                }
                 if model.finished { result }
             }.foregroundStyle(LensTheme.text)
                 .task { model.begin(travel: layout.lastLineY) }

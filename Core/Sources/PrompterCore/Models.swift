@@ -79,6 +79,8 @@ public struct Script: Identifiable, Codable, Equatable, Sendable {
     public var updatedAt: Date
     public var settings: PromptSettings
     public var isSample: Bool
+    public var sourceScriptID: UUID?
+    public var scriptStyle: ScriptStyle?
     public var sourceTransferHash: String?
     public var savedPresentationMode: PresentationMode?
     public var talkingPointTexts: [String: String]?

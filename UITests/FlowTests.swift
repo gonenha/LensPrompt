@@ -2,6 +2,25 @@ import XCTest
 
 final class FlowTests: XCTestCase {
     @MainActor
+    func testAISettingsAndMissingKeyDoNotCreateScripts() {
+        let app = XCUIApplication(); app.launch()
+        app.buttons["settings"].tap()
+        XCTAssertTrue(app.navigationBars["הגדרות"].waitForExistence(timeout: 3))
+        app.buttons["סיום"].tap()
+        reveal(app.buttons["sample-script"], in: app, upwards: true)
+        app.buttons["sample-script"].tap()
+        app.buttons["script-styles"].tap()
+        XCTAssertTrue(app.buttons["generate-styles"].waitForExistence(timeout: 3))
+        app.buttons["generate-styles"].tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["יש לשמור מפתח API בהגדרות לפני היצירה."].exists)
+        XCTAssertFalse(app.buttons["save-styles"].exists)
+        app.alerts.buttons.firstMatch.tap()
+        app.buttons["סגירה"].tap()
+        XCTAssertTrue(app.buttons["prepare"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
     func testLargeTextEditorCanReachSpeakingPointAndPrepare() {
         let app = XCUIApplication()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
